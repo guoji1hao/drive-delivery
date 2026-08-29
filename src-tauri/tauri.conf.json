@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "双盘发货助手",
+  "version": "0.1.0",
+  "identifier": "com.dualdrive.shipper",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "双盘发货助手",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 960,
+        "minHeight": 680,
+        "center": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "shortDescription": "文件同时上传百度网盘和夸克网盘并整理分享结果",
+    "longDescription": "双盘发货助手支持拖入文件或文件夹、并行处理百度网盘与夸克网盘任务、保存历史记录并一键复制分享文案。",
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "languages": ["SimpChinese"]
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
