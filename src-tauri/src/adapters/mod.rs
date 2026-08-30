@@ -1,5 +1,4 @@
 pub mod baidu;
-pub mod quark;
 
 use crate::{
     errors::AppResult,

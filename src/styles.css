@@ -418,8 +418,17 @@ a {
 .settings-grid,
 .capability-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.settings-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.platform-grid,
+.result-grid,
+.capability-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .platform-grid {
@@ -484,10 +493,6 @@ a {
 
 .provider-dot.baidu {
   background: #316ee8;
-}
-
-.provider-dot.quark {
-  background: #ec7b32;
 }
 
 .state-label {

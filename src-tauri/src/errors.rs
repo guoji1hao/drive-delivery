@@ -19,8 +19,6 @@ pub enum AppError {
     Database(String),
     #[error("系统安全存储错误：{0}")]
     SecureStorage(String),
-    #[error("系统能力不可用：{0}")]
-    Unavailable(String),
     #[error("{0}")]
     Other(String),
 }

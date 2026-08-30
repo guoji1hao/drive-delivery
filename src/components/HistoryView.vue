@@ -64,7 +64,6 @@ onMounted(search);
             <th>文件</th>
             <th>上传时间</th>
             <th>百度</th>
-            <th>夸克</th>
             <th>状态</th>
             <th />
           </tr>
@@ -80,15 +79,11 @@ onMounted(search);
               <a v-if="record.baiduUrl" :href="record.baiduUrl" target="_blank">已生成</a>
               <span v-else>无链接</span>
             </td>
-            <td>
-              <a v-if="record.quarkUrl" :href="record.quarkUrl" target="_blank">已生成</a>
-              <span v-else>无链接</span>
-            </td>
             <td>{{ taskStateText[record.taskStatus] }}</td>
             <td>
               <button
                 class="small-button"
-                :disabled="!record.baiduUrl && !record.quarkUrl"
+                :disabled="!record.baiduUrl"
                 @click="copy(record)"
               >
                 复制分享

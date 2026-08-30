@@ -55,7 +55,6 @@ export interface UploadTask {
   state: TaskState;
   message?: string;
   baidu: PlatformTask;
-  quark: PlatformTask;
 }
 
 export interface HistoryRecord {
@@ -72,17 +71,10 @@ export interface HistoryRecord {
   baiduCode?: string;
   baiduExpiresAt?: number;
   baiduShareId?: string;
-  quarkPath?: string;
-  quarkRemoteId?: string;
-  quarkUrl?: string;
-  quarkCode?: string;
-  quarkExpiresAt?: number;
-  quarkShareId?: string;
 }
 
 export interface AppSettings {
   baiduDefaultDir: string;
-  quarkDefaultDir: string;
   datedSubdirectory: boolean;
   maxConcurrentFiles: number;
   retryLimit: number;
@@ -92,7 +84,7 @@ export interface AppSettings {
 }
 
 export interface AuthStatus {
-  provider: "baidu" | "quark";
+  provider: "baidu";
   authenticated: boolean;
   available: boolean;
   expiresAt?: number;
@@ -116,7 +108,7 @@ export interface AuthPollResult {
 }
 
 export interface CapabilityReport {
-  provider: "baidu" | "quark";
+  provider: "baidu";
   oauth: string;
   upload: string;
   resume: string;

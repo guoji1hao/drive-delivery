@@ -6,10 +6,10 @@ import ResultCard from "./ResultCard.vue";
 
 defineProps<{ task: UploadTask }>();
 const emit = defineEmits<{
-  pause: [taskId: string, provider: string];
-  retry: [taskId: string, provider: string];
-  cancel: [taskId: string, provider: string];
-  copy: [taskId: string, provider?: string];
+  pause: [taskId: string];
+  retry: [taskId: string];
+  cancel: [taskId: string];
+  copy: [taskId: string];
 }>();
 </script>
 
@@ -35,25 +35,16 @@ const emit = defineEmits<{
     <div class="platform-grid">
       <PlatformProgress
         name="百度网盘"
-        provider="baidu"
         :value="task.baidu"
-        @pause="emit('pause', task.id, $event)"
-        @retry="emit('retry', task.id, $event)"
-        @cancel="emit('cancel', task.id, $event)"
-      />
-      <PlatformProgress
-        name="夸克网盘"
-        provider="quark"
-        :value="task.quark"
-        @pause="emit('pause', task.id, $event)"
-        @retry="emit('retry', task.id, $event)"
-        @cancel="emit('cancel', task.id, $event)"
+        @pause="emit('pause', task.id)"
+        @retry="emit('retry', task.id)"
+        @cancel="emit('cancel', task.id)"
       />
     </div>
 
     <ResultCard
       :task="task"
-      @copy="emit('copy', task.id, $event)"
+      @copy="emit('copy', task.id)"
     />
   </article>
 </template>

@@ -1,7 +1,7 @@
 use crate::{
     adapters::{
         DriveAdapter, ProgressSink, UploadOutcome, UploadProgress, UploadRequest,
-        baidu::BaiduDriveAdapter, quark::QuarkDriveAdapter,
+        baidu::BaiduDriveAdapter,
     },
     clipboard,
     database::Database,
@@ -38,24 +38,8 @@ pub struct TaskManager {
     database: Arc<Database>,
     settings: Arc<SettingsService>,
     baidu: Arc<BaiduDriveAdapter>,
-    quark: Arc<QuarkDriveAdapter>,
     log: Arc<LogService>,
     cancellation: AsyncMutex<HashMap<String, CancellationToken>>,
-}
-
-#[derive(Clone, Copy)]
-enum Provider {
-    Baidu,
-    Quark,
-}
-
-impl Provider {
-    fn name(self) -> &'static str {
-        match self {
-            Self::Baidu => "baidu",
-            Self::Quark => "quark",
-        }
-    }
 }
 
 impl TaskManager {
@@ -64,7 +48,6 @@ impl TaskManager {
         database: Arc<Database>,
         settings: Arc<SettingsService>,
         baidu: Arc<BaiduDriveAdapter>,
-        quark: Arc<QuarkDriveAdapter>,
         log: Arc<LogService>,
     ) -> Self {
         Self {
@@ -72,7 +55,6 @@ impl TaskManager {
             database,
             settings,
             baidu,
-            quark,
             log,
             cancellation: AsyncMutex::new(HashMap::new()),
         }
@@ -123,7 +105,6 @@ impl TaskManager {
                     state: TaskState::Waiting,
                     message: None,
                     baidu: PlatformTask::waiting(size),
-                    quark: PlatformTask::waiting(size),
                 }
             };
             let should_start = task.state != TaskState::Duplicate;
@@ -136,7 +117,7 @@ impl TaskManager {
                 tokio::spawn(async move {
                     let permit = semaphore.acquire_owned().await;
                     if permit.is_ok() {
-                        let _ = manager.process_task(&task.id, None).await;
+                        let _ = manager.process_task(&task.id).await;
                     }
                 });
             }
@@ -148,37 +129,24 @@ impl TaskManager {
         })
     }
 
-    pub async fn pause(&self, task_id: &str, provider: Option<&str>) -> AppResult<UploadTask> {
-        self.set_terminal_control_state(task_id, provider, PlatformState::Paused, TaskState::Paused)
+    pub async fn pause(&self, task_id: &str) -> AppResult<UploadTask> {
+        self.set_terminal_control_state(task_id, PlatformState::Paused, TaskState::Paused)
             .await
     }
 
-    pub async fn cancel(&self, task_id: &str, provider: Option<&str>) -> AppResult<UploadTask> {
-        self.set_terminal_control_state(
-            task_id,
-            provider,
-            PlatformState::Cancelled,
-            TaskState::Cancelled,
-        )
-        .await
+    pub async fn cancel(&self, task_id: &str) -> AppResult<UploadTask> {
+        self.set_terminal_control_state(task_id, PlatformState::Cancelled, TaskState::Cancelled)
+            .await
     }
 
-    pub async fn retry(
-        self: &Arc<Self>,
-        task_id: &str,
-        provider: Option<&str>,
-    ) -> AppResult<UploadTask> {
+    pub async fn retry(self: &Arc<Self>, task_id: &str) -> AppResult<UploadTask> {
         let mut task = self
             .database
             .get_task(task_id)?
             .ok_or_else(|| AppError::NotFound(task_id.to_string()))?;
-        for (name, platform) in [("baidu", &mut task.baidu), ("quark", &mut task.quark)] {
-            if provider.is_none() || provider == Some(name) {
-                if platform.state != PlatformState::Completed {
-                    platform.state = PlatformState::Waiting;
-                    platform.error = None;
-                }
-            }
+        if task.baidu.state != PlatformState::Completed {
+            task.baidu.state = PlatformState::Waiting;
+            task.baidu.error = None;
         }
         task.state = TaskState::Waiting;
         task.updated_at = Utc::now().timestamp();
@@ -186,9 +154,8 @@ impl TaskManager {
         self.emit_task(&task);
         let manager = Arc::clone(self);
         let task_id = task_id.to_string();
-        let provider = provider.map(ToOwned::to_owned);
         tokio::spawn(async move {
-            let _ = manager.process_task(&task_id, provider.as_deref()).await;
+            let _ = manager.process_task(&task_id).await;
         });
         Ok(task)
     }
@@ -204,7 +171,6 @@ impl TaskManager {
     async fn set_terminal_control_state(
         &self,
         task_id: &str,
-        provider: Option<&str>,
         platform_state: PlatformState,
         task_state: TaskState,
     ) -> AppResult<UploadTask> {
@@ -212,31 +178,21 @@ impl TaskManager {
             .database
             .get_task(task_id)?
             .ok_or_else(|| AppError::NotFound(task_id.to_string()))?;
-        for (name, platform) in [("baidu", &mut task.baidu), ("quark", &mut task.quark)] {
-            if (provider.is_none() || provider == Some(name))
-                && platform.state != PlatformState::Completed
-            {
-                platform.state = platform_state.clone();
-            }
+        if task.baidu.state != PlatformState::Completed {
+            task.baidu.state = platform_state;
         }
         task.state = task_state;
         task.updated_at = Utc::now().timestamp();
         self.database.save_task(&task)?;
         self.emit_task(&task);
-        let keys = match provider {
-            Some(provider) => vec![format!("{task_id}:{provider}")],
-            None => vec![format!("{task_id}:baidu"), format!("{task_id}:quark")],
-        };
         let tokens = self.cancellation.lock().await;
-        for key in keys {
-            if let Some(token) = tokens.get(&key) {
-                token.cancel();
-            }
+        if let Some(token) = tokens.get(task_id) {
+            token.cancel();
         }
         Ok(task)
     }
 
-    async fn process_task(&self, task_id: &str, only: Option<&str>) -> AppResult<()> {
+    async fn process_task(&self, task_id: &str) -> AppResult<()> {
         let task = self
             .database
             .get_task(task_id)?
@@ -250,43 +206,25 @@ impl TaskManager {
         }
         self.publish(&shared)?;
         let settings = self.settings.get()?;
-        let baidu_enabled = only.is_none() || only == Some("baidu");
-        let quark_enabled = only.is_none() || only == Some("quark");
-        let baidu_future = async {
-            if baidu_enabled {
-                self.process_provider_with_retries(Arc::clone(&shared), Provider::Baidu, &settings)
-                    .await
-            } else {
-                Ok(())
-            }
-        };
-        let quark_future = async {
-            if quark_enabled {
-                self.process_provider_with_retries(Arc::clone(&shared), Provider::Quark, &settings)
-                    .await
-            } else {
-                Ok(())
-            }
-        };
-        let _ = tokio::join!(baidu_future, quark_future);
+        let _ = self
+            .process_baidu_with_retries(Arc::clone(&shared), &settings)
+            .await;
         {
             let mut task = shared.lock();
             task.state = overall_state(&task);
             task.updated_at = Utc::now().timestamp();
             if task.state == TaskState::Completed {
-                task.message = Some("两个平台均已处理完成".to_string());
-            } else if task.state == TaskState::PartialSuccess {
-                task.message = Some("部分平台已完成，可单独重试失败平台".to_string());
+                task.message = Some("百度网盘处理完成".to_string());
             }
         }
         let final_task = self.publish(&shared)?;
         if matches!(
             final_task.state,
-            TaskState::Completed | TaskState::PartialSuccess | TaskState::Duplicate
+            TaskState::Completed | TaskState::Duplicate
         ) {
             self.database.save_history(&final_task)?;
             if settings.auto_copy {
-                let text = share_manager::format_task(&final_task, &settings, None);
+                let text = share_manager::format_task(&final_task, &settings);
                 if text.contains("http") {
                     let _ = clipboard::copy_text(&text);
                 }
@@ -295,18 +233,14 @@ impl TaskManager {
         Ok(())
     }
 
-    async fn process_provider_with_retries(
+    async fn process_baidu_with_retries(
         &self,
         task: Arc<Mutex<UploadTask>>,
-        provider: Provider,
         settings: &AppSettings,
     ) -> AppResult<()> {
         let mut retry = 0_u32;
         loop {
-            match self
-                .process_provider(Arc::clone(&task), provider, settings)
-                .await
-            {
+            match self.process_baidu(Arc::clone(&task), settings).await {
                 Ok(()) => return Ok(()),
                 Err(error)
                     if matches!(error, AppError::Provider(_)) && retry < settings.retry_limit =>
@@ -314,17 +248,17 @@ impl TaskManager {
                     retry += 1;
                     let delay = 1_u64 << (retry - 1).min(5);
                     self.log.info(
-                        provider.name(),
+                        "baidu",
                         &format!("平台任务失败，{delay} 秒后自动执行第 {retry} 次重试"),
                     );
                     sleep(Duration::from_secs(delay)).await;
 
                     let task_id = task.lock().id.clone();
                     if let Some(persisted) = self.database.get_task(&task_id)? {
-                        let requested = platform_ref(&persisted, provider).state.clone();
+                        let requested = persisted.baidu.state.clone();
                         if matches!(requested, PlatformState::Paused | PlatformState::Cancelled) {
                             let mut task = task.lock();
-                            platform_mut(&mut task, provider).state = requested;
+                            task.baidu.state = requested;
                             return Err(AppError::Paused);
                         }
                     }
@@ -334,33 +268,28 @@ impl TaskManager {
         }
     }
 
-    async fn process_provider(
+    async fn process_baidu(
         &self,
         task: Arc<Mutex<UploadTask>>,
-        provider: Provider,
         settings: &AppSettings,
     ) -> AppResult<()> {
         let (task_id, local_path, file_name, file_size, existing, previous_state) = {
             let task = task.lock();
-            let platform = platform_ref(&task, provider);
             (
                 task.id.clone(),
                 PathBuf::from(&task.local_path),
                 task.file_name.clone(),
                 task.file_size,
-                platform.clone(),
-                platform.state.clone(),
+                task.baidu.clone(),
+                task.baidu.state.clone(),
             )
         };
         if previous_state == PlatformState::Completed {
             return Ok(());
         }
-        let adapter: Arc<dyn DriveAdapter> = match provider {
-            Provider::Baidu => self.baidu.clone(),
-            Provider::Quark => self.quark.clone(),
-        };
+        let adapter: Arc<dyn DriveAdapter> = self.baidu.clone();
         let cancel = CancellationToken::new();
-        let cancel_key = format!("{}:{}", task_id, provider.name());
+        let cancel_key = task_id.clone();
         self.cancellation
             .lock()
             .await
@@ -380,21 +309,14 @@ impl TaskManager {
                 previous_state,
                 PlatformState::CreatingShare | PlatformState::Retryable
             );
-        let remote_dir = dated_dir(
-            match provider {
-                Provider::Baidu => &settings.baidu_default_dir,
-                Provider::Quark => &settings.quark_default_dir,
-            },
-            settings.dated_subdirectory,
-        );
+        let remote_dir = dated_dir(&settings.baidu_default_dir, settings.dated_subdirectory);
         let progress_task = Arc::clone(&task);
         let database = Arc::clone(&self.database);
         let app = self.app.clone();
-        let progress_provider = provider;
         let progress: ProgressSink = Arc::new(move |value: UploadProgress| {
             let snapshot = {
                 let mut task = progress_task.lock();
-                let platform = platform_mut(&mut task, progress_provider);
+                let platform = &mut task.baidu;
                 platform.state = PlatformState::Uploading;
                 platform.uploaded_bytes = value.uploaded_bytes;
                 if value.total_bytes > 0 {
@@ -419,12 +341,8 @@ impl TaskManager {
         } else {
             {
                 let mut task = task.lock();
-                let platform = platform_mut(&mut task, provider);
-                platform.state = if matches!(provider, Provider::Baidu) {
-                    PlatformState::Hashing
-                } else {
-                    PlatformState::Uploading
-                };
+                let platform = &mut task.baidu;
+                platform.state = PlatformState::Hashing;
                 platform.error = None;
                 task.updated_at = Utc::now().timestamp();
             }
@@ -441,19 +359,18 @@ impl TaskManager {
             match adapter.upload_file(request, progress, cancel.clone()).await {
                 Ok(outcome) => outcome,
                 Err(error) => {
-                    self.finish_with_error(&task, provider, &error)?;
+                    self.finish_with_error(&task, &error)?;
                     self.cancellation.lock().await.remove(&cancel_key);
                     return Err(error);
                 }
             }
         };
         if outcome.instant_upload {
-            self.log
-                .info(provider.name(), "官方接口返回秒传或已存在文件");
+            self.log.info("baidu", "官方接口返回秒传或已存在文件");
         }
         {
             let mut task = task.lock();
-            let platform = platform_mut(&mut task, provider);
+            let platform = &mut task.baidu;
             platform.remote_path = Some(outcome.remote_path.clone());
             platform.remote_id = outcome.remote_id.clone();
             platform.upload_id = outcome.upload_id.clone();
@@ -470,14 +387,14 @@ impl TaskManager {
         {
             Ok(share) => {
                 let mut task = task.lock();
-                let platform = platform_mut(&mut task, provider);
+                let platform = &mut task.baidu;
                 platform.share = share;
                 platform.state = PlatformState::Completed;
                 platform.error = None;
                 task.updated_at = Utc::now().timestamp();
             }
             Err(error) => {
-                self.finish_with_error(&task, provider, &error)?;
+                self.finish_with_error(&task, &error)?;
                 self.cancellation.lock().await.remove(&cancel_key);
                 return Err(error);
             }
@@ -487,26 +404,20 @@ impl TaskManager {
         Ok(())
     }
 
-    fn finish_with_error(
-        &self,
-        task: &Arc<Mutex<UploadTask>>,
-        provider: Provider,
-        error: &AppError,
-    ) -> AppResult<()> {
+    fn finish_with_error(&self, task: &Arc<Mutex<UploadTask>>, error: &AppError) -> AppResult<()> {
         let task_id = task.lock().id.clone();
         let requested_state = self
             .database
             .get_task(&task_id)?
-            .map(|persisted| platform_ref(&persisted, provider).state.clone());
+            .map(|persisted| persisted.baidu.state.clone());
         {
             let mut task = task.lock();
-            let platform = platform_mut(&mut task, provider);
+            let platform = &mut task.baidu;
             if !matches!(
                 platform.state,
                 PlatformState::Paused | PlatformState::Cancelled
             ) {
                 platform.state = match error {
-                    AppError::Unavailable(_) => PlatformState::Unavailable,
                     AppError::Paused => match requested_state {
                         Some(PlatformState::Cancelled) => PlatformState::Cancelled,
                         _ => PlatformState::Paused,
@@ -518,7 +429,7 @@ impl TaskManager {
             platform.retry_count += 1;
             task.updated_at = Utc::now().timestamp();
         }
-        self.log.error(provider.name(), &error.to_string());
+        self.log.error("baidu", &error.to_string());
         self.publish(task).map(|_| ())
     }
 
@@ -534,41 +445,12 @@ impl TaskManager {
     }
 }
 
-fn platform_ref(task: &UploadTask, provider: Provider) -> &PlatformTask {
-    match provider {
-        Provider::Baidu => &task.baidu,
-        Provider::Quark => &task.quark,
-    }
-}
-
-fn platform_mut(task: &mut UploadTask, provider: Provider) -> &mut PlatformTask {
-    match provider {
-        Provider::Baidu => &mut task.baidu,
-        Provider::Quark => &mut task.quark,
-    }
-}
-
 fn overall_state(task: &UploadTask) -> TaskState {
-    let states = [&task.baidu.state, &task.quark.state];
-    if states
-        .iter()
-        .all(|state| **state == PlatformState::Completed)
-    {
-        TaskState::Completed
-    } else if states
-        .iter()
-        .any(|state| **state == PlatformState::Completed)
-    {
-        TaskState::PartialSuccess
-    } else if states.iter().any(|state| **state == PlatformState::Paused) {
-        TaskState::Paused
-    } else if states
-        .iter()
-        .all(|state| **state == PlatformState::Cancelled)
-    {
-        TaskState::Cancelled
-    } else {
-        TaskState::Failed
+    match task.baidu.state {
+        PlatformState::Completed => TaskState::Completed,
+        PlatformState::Paused => TaskState::Paused,
+        PlatformState::Cancelled => TaskState::Cancelled,
+        _ => TaskState::Failed,
     }
 }
 
@@ -590,24 +472,15 @@ fn duplicate_task(
         history.baidu_expires_at,
         history.baidu_share_id,
     );
-    let mut quark = history_platform(
-        size,
-        history.quark_path,
-        history.quark_remote_id,
-        history.quark_url,
-        history.quark_code,
-        history.quark_expires_at,
-        history.quark_share_id,
-    );
+    let needs_upload = baidu.remote_path.is_none();
     let baidu_needs_share = baidu.remote_path.is_some() && !share_valid(&baidu.share, now);
-    let quark_needs_share = quark.remote_path.is_some() && !share_valid(&quark.share, now);
+    if needs_upload {
+        baidu = PlatformTask::waiting(size);
+    }
     if baidu_needs_share {
         baidu.state = PlatformState::CreatingShare;
     }
-    if quark_needs_share {
-        quark.state = PlatformState::CreatingShare;
-    }
-    let needs_share = baidu_needs_share || quark_needs_share;
+    let needs_processing = needs_upload || baidu_needs_share;
     UploadTask {
         id: Uuid::new_v4().to_string(),
         batch_id: batch_id.to_string(),
@@ -617,18 +490,19 @@ fn duplicate_task(
         file_hash: hash,
         created_at: now,
         updated_at: now,
-        state: if needs_share {
+        state: if needs_processing {
             TaskState::Waiting
         } else {
             TaskState::Duplicate
         },
-        message: Some(if needs_share {
-            "历史分享已过期，将只尝试重新创建分享".to_string()
+        message: Some(if needs_upload {
+            "历史记录中没有百度上传结果，将开始上传百度网盘".to_string()
+        } else if baidu_needs_share {
+            "已发现百度上传记录，将只尝试获取最新分享结果".to_string()
         } else {
             "该文件已经上传过，已直接显示历史分享链接".to_string()
         }),
         baidu,
-        quark,
     }
 }
 
@@ -743,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_retries_only_the_expired_platform_share() {
+    fn duplicate_reuses_valid_baidu_share() {
         let history = HistoryRecord {
             id: "history-1".into(),
             file_name: "file.zip".into(),
@@ -758,12 +632,36 @@ mod tests {
             baidu_code: None,
             baidu_expires_at: Some(200),
             baidu_share_id: None,
-            quark_path: Some("夸克网盘/file.zip".into()),
-            quark_remote_id: Some("fid".into()),
-            quark_url: Some("https://pan.quark.cn/expired".into()),
-            quark_code: None,
-            quark_expires_at: Some(99),
-            quark_share_id: None,
+        };
+        let task = duplicate_task(
+            "batch",
+            Path::new("C:/file.zip"),
+            "file.zip".into(),
+            10,
+            "hash".into(),
+            100,
+            history,
+        );
+        assert_eq!(task.state, TaskState::Duplicate);
+        assert_eq!(task.baidu.state, PlatformState::Completed);
+    }
+
+    #[test]
+    fn legacy_history_without_baidu_result_uploads_baidu() {
+        let history = HistoryRecord {
+            id: "history-legacy".into(),
+            file_name: "file.zip".into(),
+            file_size: 10,
+            local_path: "C:/file.zip".into(),
+            file_hash: "hash".into(),
+            uploaded_at: 1,
+            task_status: TaskState::Completed,
+            baidu_path: None,
+            baidu_remote_id: None,
+            baidu_url: None,
+            baidu_code: None,
+            baidu_expires_at: None,
+            baidu_share_id: None,
         };
         let task = duplicate_task(
             "batch",
@@ -775,7 +673,6 @@ mod tests {
             history,
         );
         assert_eq!(task.state, TaskState::Waiting);
-        assert_eq!(task.baidu.state, PlatformState::Completed);
-        assert_eq!(task.quark.state, PlatformState::CreatingShare);
+        assert_eq!(task.baidu.state, PlatformState::Waiting);
     }
 }

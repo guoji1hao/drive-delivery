@@ -36,9 +36,6 @@ watch(
 const baiduStatus = computed(() =>
   props.auth.find((item) => item.provider === "baidu"),
 );
-const quarkStatus = computed(() =>
-  props.auth.find((item) => item.provider === "quark"),
-);
 
 async function save() {
   busy.value = "settings";
@@ -107,23 +104,6 @@ async function clearBaidu() {
   }
 }
 
-async function authorizeQuark() {
-  busy.value = "quark";
-  try {
-    const message = await api.ensureAndStartQuarkAuth();
-    emit("authChanged", {
-      provider: "quark",
-      authenticated: true,
-      available: true,
-      message,
-    });
-    emit("toast", message);
-  } catch (error) {
-    emit("toast", String(error));
-  } finally {
-    busy.value = undefined;
-  }
-}
 </script>
 
 <template>
@@ -177,47 +157,12 @@ async function authorizeQuark() {
         </button>
       </section>
 
-      <section class="settings-card auth-card">
-        <div class="card-title-row">
-          <div>
-            <span class="provider-dot quark" />
-            <strong>夸克网盘授权</strong>
-          </div>
-          <span class="status-chip" :class="{ online: quarkStatus?.authenticated }">
-            {{ quarkStatus?.authenticated ? "已授权" : "未授权" }}
-          </span>
-        </div>
-        <p>{{ quarkStatus?.message }}</p>
-        <button
-          class="small-button"
-          :disabled="busy === 'quark'"
-          @click="authorizeQuark"
-        >
-          {{ busy === "quark" ? "正在检测、安装或授权…" : "检测并绑定夸克网盘" }}
-        </button>
-        <p class="field-help">
-          每次点击都会先检测夸克官方 Skill；检测到就直接授权，未检测到才会自动安装并继续授权。
-          首次安装可能会在默认 WSL 中安装 Node.js 和 unzip，不会回退到 Cookie 或逆向接口。
-        </p>
-        <button
-          v-if="!quarkStatus?.available"
-          class="text-button"
-          @click="openUrl('https://github.com/quark-clouddrive/quarkclouddrive_offical')"
-        >
-          未安装？打开官方一键安装说明
-        </button>
-      </section>
-
       <section class="settings-card form-card">
         <h3>上传目录</h3>
         <label>
           <span>百度默认目录</span>
           <input v-model="form.baiduDefaultDir" />
           <small>必须位于开放平台分配的 /apps/应用目录/ 下</small>
-        </label>
-        <label>
-          <span>夸克默认目录</span>
-          <input v-model="form.quarkDefaultDir" />
         </label>
         <label class="check-row">
           <input v-model="form.datedSubdirectory" type="checkbox" />
@@ -256,7 +201,7 @@ async function authorizeQuark() {
         <h3>复制文本模板</h3>
         <textarea v-model="form.copyTemplate" rows="7" />
         <p class="field-help">
-          可用变量：{filename}、{baidu_url}、{baidu_code_line}、{quark_url}、{quark_code_line}
+          可用变量：{filename}、{baidu_url}、{baidu_code_line}
         </p>
       </section>
 
@@ -275,7 +220,7 @@ async function authorizeQuark() {
       <h3>当前 Adapter 实现依据</h3>
       <div class="capability-grid">
         <article v-for="item in capabilities" :key="item.provider">
-          <strong>{{ item.provider === "baidu" ? "百度网盘" : "夸克网盘" }}</strong>
+          <strong>百度网盘</strong>
           <p>{{ item.oauth }}</p>
           <p>{{ item.upload }}</p>
           <p>{{ item.resume }}</p>

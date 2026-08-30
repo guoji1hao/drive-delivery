@@ -9,15 +9,14 @@ import {
 } from "../utils/format";
 
 const props = defineProps<{
-  name: "百度网盘" | "夸克网盘";
-  provider: "baidu" | "quark";
+  name: string;
   value: PlatformTask;
 }>();
 
 const emit = defineEmits<{
-  pause: [provider: string];
-  retry: [provider: string];
-  cancel: [provider: string];
+  pause: [];
+  retry: [];
+  cancel: [];
 }>();
 
 const tone = computed(() => {
@@ -34,7 +33,7 @@ const tone = computed(() => {
   <article class="platform-panel" :class="tone">
     <header>
       <div class="provider-name">
-        <span class="provider-dot" :class="provider" />
+        <span class="provider-dot baidu" />
         <strong>{{ name }}</strong>
       </div>
       <span class="state-label">{{ platformStateText[value.state] }}</span>
@@ -59,23 +58,23 @@ const tone = computed(() => {
       <button
         v-if="isBusy(value.state)"
         class="text-button"
-        @click="emit('pause', provider)"
+        @click="emit('pause')"
       >
         暂停
       </button>
       <button
         v-if="isBusy(value.state)"
         class="text-button danger-text"
-        @click="emit('cancel', provider)"
+        @click="emit('cancel')"
       >
         取消
       </button>
       <button
         v-if="canRetry(value.state)"
         class="small-button"
-        @click="emit('retry', provider)"
+        @click="emit('retry')"
       >
-        {{ value.state === "paused" ? "继续" : "仅重试此平台" }}
+        {{ value.state === "paused" ? "继续" : "重试" }}
       </button>
     </footer>
   </article>

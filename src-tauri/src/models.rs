@@ -87,7 +87,6 @@ pub struct UploadTask {
     pub state: TaskState,
     pub message: Option<String>,
     pub baidu: PlatformTask,
-    pub quark: PlatformTask,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,12 +105,6 @@ pub struct HistoryRecord {
     pub baidu_code: Option<String>,
     pub baidu_expires_at: Option<i64>,
     pub baidu_share_id: Option<String>,
-    pub quark_path: Option<String>,
-    pub quark_remote_id: Option<String>,
-    pub quark_url: Option<String>,
-    pub quark_code: Option<String>,
-    pub quark_expires_at: Option<i64>,
-    pub quark_share_id: Option<String>,
 }
 
 impl From<&UploadTask> for HistoryRecord {
@@ -130,12 +123,6 @@ impl From<&UploadTask> for HistoryRecord {
             baidu_code: task.baidu.share.code.clone(),
             baidu_expires_at: task.baidu.share.expires_at,
             baidu_share_id: task.baidu.share.share_id.clone(),
-            quark_path: task.quark.remote_path.clone(),
-            quark_remote_id: task.quark.remote_id.clone(),
-            quark_url: task.quark.share.url.clone(),
-            quark_code: task.quark.share.code.clone(),
-            quark_expires_at: task.quark.share.expires_at,
-            quark_share_id: task.quark.share.share_id.clone(),
         }
     }
 }
@@ -144,7 +131,6 @@ impl From<&UploadTask> for HistoryRecord {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub baidu_default_dir: String,
-    pub quark_default_dir: String,
     pub dated_subdirectory: bool,
     pub max_concurrent_files: u32,
     pub retry_limit: u32,
@@ -157,12 +143,12 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             baidu_default_dir: "/apps/双盘发货助手/自动发货/".to_string(),
-            quark_default_dir: "/自动发货/".to_string(),
             dated_subdirectory: false,
             max_concurrent_files: 2,
             retry_limit: 3,
             share_period_days: 0,
-            copy_template: "文件：{filename}\n百度网盘：\n{baidu_url}\n{baidu_code_line}\n夸克网盘：\n{quark_url}\n{quark_code_line}".to_string(),
+            copy_template: "文件：{filename}\n百度网盘：\n{baidu_url}\n{baidu_code_line}"
+                .to_string(),
             auto_copy: false,
         }
     }

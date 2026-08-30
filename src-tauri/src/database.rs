@@ -60,7 +60,7 @@ impl Database {
              CREATE INDEX IF NOT EXISTS idx_history_time ON history(uploaded_at DESC);",
         )?;
         ensure_history_column(&connection, "baidu_remote_id", "TEXT")?;
-        ensure_history_column(&connection, "quark_remote_id", "TEXT")?;
+        // 旧版本的夸克列保留在表结构中，避免破坏性迁移；当前版本不再读取或写入这些列。
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -116,16 +116,14 @@ impl Database {
             if matches!(task.state, TaskState::Waiting | TaskState::Processing) {
                 task.state = TaskState::Paused;
                 task.message = Some("程序上次退出时任务未完成，可点击继续".to_string());
-                for platform in [&mut task.baidu, &mut task.quark] {
-                    if matches!(
-                        platform.state,
-                        PlatformState::Waiting
-                            | PlatformState::Hashing
-                            | PlatformState::Uploading
-                            | PlatformState::CreatingShare
-                    ) {
-                        platform.state = PlatformState::Paused;
-                    }
+                if matches!(
+                    task.baidu.state,
+                    PlatformState::Waiting
+                        | PlatformState::Hashing
+                        | PlatformState::Uploading
+                        | PlatformState::CreatingShare
+                ) {
+                    task.baidu.state = PlatformState::Paused;
                 }
                 self.save_task(task)?;
                 recovered.push(task.clone());
@@ -139,18 +137,14 @@ impl Database {
         self.connection.lock().execute(
             "INSERT INTO history (
                id,file_name,file_size,local_path,file_hash,uploaded_at,task_status,
-               baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id,
-               quark_path,quark_remote_id,quark_url,quark_code,quark_expires_at,quark_share_id
-             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+               baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
              ON CONFLICT(id) DO UPDATE SET
                uploaded_at=excluded.uploaded_at, task_status=excluded.task_status,
                baidu_path=excluded.baidu_path, baidu_remote_id=excluded.baidu_remote_id,
                baidu_url=excluded.baidu_url,
                baidu_code=excluded.baidu_code, baidu_expires_at=excluded.baidu_expires_at,
-               baidu_share_id=excluded.baidu_share_id, quark_path=excluded.quark_path,
-               quark_remote_id=excluded.quark_remote_id,
-               quark_url=excluded.quark_url, quark_code=excluded.quark_code,
-               quark_expires_at=excluded.quark_expires_at, quark_share_id=excluded.quark_share_id",
+               baidu_share_id=excluded.baidu_share_id",
             params![
                 record.id,
                 record.file_name,
@@ -164,13 +158,7 @@ impl Database {
                 record.baidu_url,
                 record.baidu_code,
                 record.baidu_expires_at,
-                record.baidu_share_id,
-                record.quark_path,
-                record.quark_remote_id,
-                record.quark_url,
-                record.quark_code,
-                record.quark_expires_at,
-                record.quark_share_id
+                record.baidu_share_id
             ],
         )?;
         Ok(())
@@ -181,8 +169,7 @@ impl Database {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
             "SELECT id,file_name,file_size,local_path,file_hash,uploaded_at,task_status,
-                    baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id,
-                    quark_path,quark_remote_id,quark_url,quark_code,quark_expires_at,quark_share_id
+                    baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id
              FROM history WHERE file_name LIKE ?1 ORDER BY uploaded_at DESC LIMIT ?2",
         )?;
         let rows = statement.query_map(params![pattern, limit as i64], history_from_row)?;
@@ -194,9 +181,9 @@ impl Database {
             .lock()
             .query_row(
                 "SELECT id,file_name,file_size,local_path,file_hash,uploaded_at,task_status,
-                        baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id,
-                        quark_path,quark_remote_id,quark_url,quark_code,quark_expires_at,quark_share_id
-                 FROM history WHERE file_hash=?1 AND file_size=?2 ORDER BY uploaded_at DESC LIMIT 1",
+                        baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id
+                 FROM history WHERE file_hash=?1 AND file_size=?2
+                 ORDER BY (baidu_path IS NOT NULL) DESC, uploaded_at DESC LIMIT 1",
                 params![hash, size as i64],
                 history_from_row,
             )
@@ -254,7 +241,38 @@ impl Database {
 }
 
 fn parse_task(payload: String) -> AppResult<UploadTask> {
-    serde_json::from_str(&payload).map_err(|error| AppError::Database(error.to_string()))
+    let mut task: UploadTask =
+        serde_json::from_str(&payload).map_err(|error| AppError::Database(error.to_string()))?;
+    normalize_legacy_task(&mut task);
+    Ok(task)
+}
+
+fn normalize_legacy_task(task: &mut UploadTask) {
+    if task.state == TaskState::PartialSuccess {
+        task.state = baidu_only_state(&task.baidu.state);
+        task.message = Some("已按百度网盘结果更新旧版任务状态".to_string());
+    }
+    if task.state == TaskState::Duplicate && task.baidu.remote_path.is_none() {
+        task.state = TaskState::Paused;
+        task.baidu = crate::models::PlatformTask::waiting(task.file_size);
+        task.baidu.state = PlatformState::Paused;
+        task.message = Some("旧记录中没有百度上传结果，可点击继续上传".to_string());
+    }
+}
+
+fn baidu_only_state(state: &PlatformState) -> TaskState {
+    match state {
+        PlatformState::Completed => TaskState::Completed,
+        PlatformState::Paused => TaskState::Paused,
+        PlatformState::Cancelled => TaskState::Cancelled,
+        PlatformState::Waiting => TaskState::Waiting,
+        PlatformState::Hashing | PlatformState::Uploading | PlatformState::CreatingShare => {
+            TaskState::Processing
+        }
+        PlatformState::Failed | PlatformState::Retryable | PlatformState::Unavailable => {
+            TaskState::Failed
+        }
+    }
 }
 
 fn ensure_history_column(
@@ -307,6 +325,15 @@ fn parse_task_state(value: &str) -> TaskState {
 fn history_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryRecord> {
     let size: i64 = row.get(2)?;
     let status: String = row.get(6)?;
+    let baidu_path: Option<String> = row.get(7)?;
+    let mut task_status = parse_task_state(&status);
+    if task_status == TaskState::PartialSuccess {
+        task_status = if baidu_path.is_some() {
+            TaskState::Completed
+        } else {
+            TaskState::Failed
+        };
+    }
     Ok(HistoryRecord {
         id: row.get(0)?,
         file_name: row.get(1)?,
@@ -314,26 +341,20 @@ fn history_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryRecord> 
         local_path: row.get(3)?,
         file_hash: row.get(4)?,
         uploaded_at: row.get(5)?,
-        task_status: parse_task_state(&status),
-        baidu_path: row.get(7)?,
+        task_status,
+        baidu_path,
         baidu_remote_id: row.get(8)?,
         baidu_url: row.get(9)?,
         baidu_code: row.get(10)?,
         baidu_expires_at: row.get(11)?,
         baidu_share_id: row.get(12)?,
-        quark_path: row.get(13)?,
-        quark_remote_id: row.get(14)?,
-        quark_url: row.get(15)?,
-        quark_code: row.get(16)?,
-        quark_expires_at: row.get(17)?,
-        quark_share_id: row.get(18)?,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::Database;
-    use crate::models::{PlatformTask, TaskState, UploadTask};
+    use crate::models::{PlatformState, PlatformTask, TaskState, UploadTask};
     use tempfile::tempdir;
 
     #[test]
@@ -353,7 +374,6 @@ mod tests {
             state: TaskState::Completed,
             message: None,
             baidu: PlatformTask::waiting(42),
-            quark: PlatformTask::waiting(42),
         };
         database.save_task(&task).unwrap();
         database.save_history(&task).unwrap();
@@ -403,6 +423,90 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert!(columns.contains(&"baidu_remote_id".to_string()));
-        assert!(columns.contains(&"quark_remote_id".to_string()));
+    }
+
+    #[test]
+    fn legacy_task_payload_ignores_removed_provider_fields() {
+        let mut task = UploadTask {
+            id: "task-legacy".into(),
+            batch_id: "batch-legacy".into(),
+            local_path: "C:/legacy.zip".into(),
+            file_name: "legacy.zip".into(),
+            file_size: 7,
+            file_hash: "legacy-hash".into(),
+            created_at: 1,
+            updated_at: 2,
+            state: TaskState::PartialSuccess,
+            message: None,
+            baidu: PlatformTask::waiting(7),
+        };
+        task.baidu.state = PlatformState::Completed;
+        let mut payload = serde_json::to_value(&task).unwrap();
+        payload.as_object_mut().unwrap().insert(
+            "quark".into(),
+            serde_json::to_value(PlatformTask::waiting(7)).unwrap(),
+        );
+
+        let restored = super::parse_task(serde_json::to_string(&payload).unwrap()).unwrap();
+        assert_eq!(restored.id, "task-legacy");
+        assert_eq!(restored.baidu.total_bytes, 7);
+        assert_eq!(restored.state, TaskState::Completed);
+    }
+
+    #[test]
+    fn legacy_duplicate_without_baidu_result_becomes_resumable() {
+        let task = UploadTask {
+            id: "task-quark-only".into(),
+            batch_id: "batch-legacy".into(),
+            local_path: "C:/legacy.zip".into(),
+            file_name: "legacy.zip".into(),
+            file_size: 7,
+            file_hash: "legacy-hash".into(),
+            created_at: 1,
+            updated_at: 2,
+            state: TaskState::Duplicate,
+            message: None,
+            baidu: PlatformTask::waiting(7),
+        };
+
+        let restored = super::parse_task(serde_json::to_string(&task).unwrap()).unwrap();
+        assert_eq!(restored.state, TaskState::Paused);
+        assert_eq!(restored.baidu.state, PlatformState::Paused);
+    }
+
+    #[test]
+    fn duplicate_lookup_prefers_existing_baidu_result() {
+        let dir = tempdir().unwrap();
+        let database = Database::open(&dir.path().join("history.db")).unwrap();
+        let mut baidu = PlatformTask::waiting(7);
+        baidu.state = PlatformState::Completed;
+        baidu.remote_path = Some("/apps/demo/file.zip".into());
+        let with_baidu = UploadTask {
+            id: "with-baidu".into(),
+            batch_id: "batch".into(),
+            local_path: "C:/file.zip".into(),
+            file_name: "file.zip".into(),
+            file_size: 7,
+            file_hash: "same-hash".into(),
+            created_at: 1,
+            updated_at: 1,
+            state: TaskState::Completed,
+            message: None,
+            baidu,
+        };
+        let without_baidu = UploadTask {
+            id: "without-baidu".into(),
+            updated_at: 2,
+            baidu: PlatformTask::waiting(7),
+            ..with_baidu.clone()
+        };
+        database.save_history(&with_baidu).unwrap();
+        database.save_history(&without_baidu).unwrap();
+
+        let found = database
+            .find_history_by_hash("same-hash", 7)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.id, "with-baidu");
     }
 }

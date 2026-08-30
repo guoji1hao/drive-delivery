@@ -31,7 +31,6 @@ pub fn run() {
             commands::start_baidu_auth,
             commands::poll_baidu_auth,
             commands::clear_baidu_auth,
-            commands::ensure_and_start_quark_auth,
             commands::enqueue_paths,
             commands::pause_task,
             commands::cancel_task,

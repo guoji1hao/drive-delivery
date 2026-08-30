@@ -24,18 +24,16 @@ export const api = {
   pollBaiduAuth: (deviceCode: string) =>
     invoke<AuthPollResult>("poll_baidu_auth", { deviceCode }),
   clearBaiduAuth: () => invoke<AuthStatus>("clear_baidu_auth"),
-  ensureAndStartQuarkAuth: () =>
-    invoke<string>("ensure_and_start_quark_auth"),
-  pauseTask: (taskId: string, provider?: string) =>
-    invoke<UploadTask>("pause_task", { taskId, provider }),
-  cancelTask: (taskId: string, provider?: string) =>
-    invoke<UploadTask>("cancel_task", { taskId, provider }),
-  retryTask: (taskId: string, provider?: string) =>
-    invoke<UploadTask>("retry_task", { taskId, provider }),
+  pauseTask: (taskId: string) =>
+    invoke<UploadTask>("pause_task", { taskId }),
+  cancelTask: (taskId: string) =>
+    invoke<UploadTask>("cancel_task", { taskId }),
+  retryTask: (taskId: string) =>
+    invoke<UploadTask>("retry_task", { taskId }),
   searchHistory: (query: string) =>
     invoke<HistoryRecord[]>("search_history", { query }),
-  copyTaskResult: (taskId: string, provider?: string) =>
-    invoke<string>("copy_task_result", { taskId, provider }),
+  copyTaskResult: (taskId: string) =>
+    invoke<string>("copy_task_result", { taskId }),
   copyHistoryResult: (record: HistoryRecord) =>
     invoke<string>("copy_history_result", { record }),
 };

@@ -4,26 +4,26 @@ import TaskCard from "./TaskCard.vue";
 
 defineProps<{ tasks: UploadTask[] }>();
 const emit = defineEmits<{
-  pause: [taskId: string, provider: string];
-  retry: [taskId: string, provider: string];
-  cancel: [taskId: string, provider: string];
-  copy: [taskId: string, provider?: string];
+  pause: [taskId: string];
+  retry: [taskId: string];
+  cancel: [taskId: string];
+  copy: [taskId: string];
 }>();
 
-function forwardPause(taskId: string, provider: string) {
-  emit("pause", taskId, provider);
+function forwardPause(taskId: string) {
+  emit("pause", taskId);
 }
 
-function forwardRetry(taskId: string, provider: string) {
-  emit("retry", taskId, provider);
+function forwardRetry(taskId: string) {
+  emit("retry", taskId);
 }
 
-function forwardCancel(taskId: string, provider: string) {
-  emit("cancel", taskId, provider);
+function forwardCancel(taskId: string) {
+  emit("cancel", taskId);
 }
 
-function forwardCopy(taskId: string, provider?: string) {
-  emit("copy", taskId, provider);
+function forwardCopy(taskId: string) {
+  emit("copy", taskId);
 }
 </script>
 

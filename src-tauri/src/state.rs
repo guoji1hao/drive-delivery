@@ -1,11 +1,6 @@
 use crate::{
-    adapters::{baidu::BaiduDriveAdapter, quark::QuarkDriveAdapter},
-    auth::AuthManager,
-    database::Database,
-    errors::AppResult,
-    logging::LogService,
-    settings::SettingsService,
-    task_manager::TaskManager,
+    adapters::baidu::BaiduDriveAdapter, auth::AuthManager, database::Database, errors::AppResult,
+    logging::LogService, settings::SettingsService, task_manager::TaskManager,
 };
 use std::{fs, path::PathBuf, sync::Arc};
 use tauri::{AppHandle, Manager};
@@ -14,7 +9,6 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub settings: Arc<SettingsService>,
     pub auth: Arc<AuthManager>,
-    pub quark: Arc<QuarkDriveAdapter>,
     pub tasks: Arc<TaskManager>,
     pub log: Arc<LogService>,
     pub data_dir: PathBuf,
@@ -40,13 +34,11 @@ impl AppState {
         let settings = Arc::new(SettingsService::new(database.clone()));
         let auth = Arc::new(AuthManager::new(database.clone(), log.clone())?);
         let baidu = Arc::new(BaiduDriveAdapter::new(auth.clone(), log.clone())?);
-        let quark = Arc::new(QuarkDriveAdapter::new(log.clone()));
         let tasks = Arc::new(TaskManager::new(
             app,
             database.clone(),
             settings.clone(),
             baidu,
-            quark.clone(),
             log.clone(),
         ));
         log.info("app", "双盘发货助手启动完成");
@@ -54,7 +46,6 @@ impl AppState {
             database,
             settings,
             auth,
-            quark,
             tasks,
             log,
             data_dir,

@@ -68,38 +68,37 @@ async function enqueue(paths: string[]) {
 async function control(
   action: "pause" | "retry" | "cancel",
   taskId: string,
-  provider: string,
 ) {
   try {
-    const task = await api[`${action}Task`](taskId, provider);
+    const task = await api[`${action}Task`](taskId);
     updateTask(task);
     showToast(
-      action === "pause" ? "任务已暂停" : action === "cancel" ? "任务已取消" : "已重新执行指定平台",
+      action === "pause" ? "任务已暂停" : action === "cancel" ? "任务已取消" : "已重新执行百度任务",
     );
   } catch (error) {
     showToast(String(error));
   }
 }
 
-async function copy(taskId: string, provider?: string) {
+async function copy(taskId: string) {
   try {
-    await api.copyTaskResult(taskId, provider);
-    showToast(provider ? "平台分享信息已复制" : "完整分享文案已复制");
+    await api.copyTaskResult(taskId);
+    showToast("百度分享信息已复制");
   } catch (error) {
     showToast(String(error));
   }
 }
 
-function pauseTask(taskId: string, provider: string) {
-  return control("pause", taskId, provider);
+function pauseTask(taskId: string) {
+  return control("pause", taskId);
 }
 
-function retryTask(taskId: string, provider: string) {
-  return control("retry", taskId, provider);
+function retryTask(taskId: string) {
+  return control("retry", taskId);
 }
 
-function cancelTask(taskId: string, provider: string) {
-  return control("cancel", taskId, provider);
+function cancelTask(taskId: string) {
+  return control("cancel", taskId);
 }
 
 function replaceAuth(status: AuthStatus) {
@@ -151,7 +150,7 @@ onBeforeUnmount(() => {
         <span class="brand-mark"><i /><i /></span>
         <span>
           <strong>双盘发货助手</strong>
-          <small>DUAL DRIVE DELIVERY</small>
+          <small>BAIDU DRIVE DELIVERY</small>
         </span>
       </button>
       <nav>
@@ -183,9 +182,9 @@ onBeforeUnmount(() => {
     <template v-else-if="snapshot">
       <div v-show="activeTab === 'tasks'" class="tasks-page">
         <section class="hero-copy">
-          <span class="eyebrow">一次拖入 · 双盘处理</span>
-          <h1>把交付资料，稳稳送到两个网盘。</h1>
-          <p>百度与夸克任务相互独立。一个平台失败，不会影响另一个平台已经完成的结果。</p>
+          <span class="eyebrow">一次拖入 · 自动上传</span>
+          <h1>把交付资料，稳稳送到百度网盘。</h1>
+          <p>支持大文件分片、真实进度、断点续传、失败重试和本地历史去重。</p>
         </section>
         <DropZone :active="dragActive" :busy="enqueueBusy" />
         <TaskList
@@ -198,7 +197,7 @@ onBeforeUnmount(() => {
         <section v-if="!tasks.length" class="first-run-note">
           <div>
             <strong>开始前请先完成平台授权</strong>
-            <p>百度使用官方 OAuth；夸克会先检测官方 Skill，缺失时自动安装。未授权任务会保留为可重试状态。</p>
+            <p>百度使用官方 OAuth。未授权任务会保留为可重试状态，不会伪造上传或分享结果。</p>
           </div>
           <button class="small-button" @click="activeTab = 'settings'">前往设置</button>
         </section>
