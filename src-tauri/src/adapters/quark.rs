@@ -38,12 +38,15 @@ impl QuarkDriveAdapter {
         self.resolve_runtime().await.is_ok()
     }
 
-    pub async fn install_official_component(&self) -> AppResult<String> {
+    pub async fn ensure_official_skill(&self) -> AppResult<()> {
+        self.log.info("quark", "正在检测夸克官方 Skill");
         if self.resolve_runtime().await.is_ok() {
-            return Ok("已检测到夸克官方组件，无需重复安装".to_string());
+            self.log.info("quark", "已检测到夸克官方 Skill");
+            return Ok(());
         }
 
-        self.log.info("quark", "开始安装夸克官方组件");
+        self.log
+            .info("quark", "未检测到夸克官方 Skill，开始自动安装");
         let dependencies = Command::new("wsl.exe")
             .args([
                 "-u",
@@ -103,8 +106,8 @@ bash "$install_dir/install.sh""#,
             .map_err(|error| AppError::Unavailable(format!("无法调用 WSL：{error}")))?;
         ensure_setup_success("安装夸克官方组件", &installer)?;
         self.resolve_runtime().await?;
-        self.log.info("quark", "夸克官方组件安装完成");
-        Ok("夸克官方组件安装完成，正在打开授权流程".to_string())
+        self.log.info("quark", "夸克官方 Skill 安装完成");
+        Ok(())
     }
 
     async fn resolve_runtime(&self) -> AppResult<QuarkRuntime> {

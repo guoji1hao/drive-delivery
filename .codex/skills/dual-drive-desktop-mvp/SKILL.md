@@ -25,7 +25,7 @@ Rust 的统一平台接口位于 `src-tauri/src/adapters/mod.rs`。百度和夸�
 
 百度使用官方 OAuth 2.0 设备码、Refresh Token 与三步上传。上传分片固定为官方 SDK 默认的 4 MiB，一次只保留一个分片。个人开放 API 的公开分享创建当前未确认支持，因此只能显示真实限制。
 
-夸克使用官方 Skill/组件，Windows 通过 WSL 调用。不要把 `quark-drive.cjs` 路径暴露到设置、环境变量或前端；`QuarkDriveAdapter` 应优先自动检测官方全局命令，再兼容常见 WSL Skill 目录与 `~/.quarkclouddrive`。缺失时由显式的“一键安装并绑定”按钮下载并运行官方安装脚本。
+夸克使用官方 Skill/组件，Windows 通过 WSL 调用。不要把 `quark-drive.cjs` 路径暴露到设置、环境变量或前端；绑定只能调用一个后端入口，由该入口实时检测官方全局命令、常见 WSL Skill 目录与 `~/.quarkclouddrive`。缺失时自动运行官方安装脚本，存在时不得重复安装，然后继续授权。
 
 截至 2026-08-30，夸克未公开面向普通 Windows 桌面应用的 Client ID 注册和完整 REST API 契约。不要为了模仿百度直连而猜测端点、字段或 Cookie 流程；未来获得官方文档后只替换 Adapter。
 

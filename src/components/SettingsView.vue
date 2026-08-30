@@ -110,9 +110,7 @@ async function clearBaidu() {
 async function authorizeQuark() {
   busy.value = "quark";
   try {
-    const message = quarkStatus.value?.available
-      ? await api.startQuarkAuth()
-      : await api.installAndStartQuarkAuth();
+    const message = await api.ensureAndStartQuarkAuth();
     emit("authChanged", {
       provider: "quark",
       authenticated: true,
@@ -195,19 +193,11 @@ async function authorizeQuark() {
           :disabled="busy === 'quark'"
           @click="authorizeQuark"
         >
-          {{
-            busy === "quark"
-              ? quarkStatus?.available
-                ? "等待官方授权…"
-                : "正在安装并授权…"
-              : quarkStatus?.available
-                ? "绑定夸克网盘"
-                : "一键安装并绑定夸克"
-          }}
+          {{ busy === "quark" ? "正在检测、安装或授权…" : "检测并绑定夸克网盘" }}
         </button>
         <p class="field-help">
-          应用会自动检测夸克官方组件，不再要求填写脚本路径，也不会回退到 Cookie 或逆向接口。
-          首次一键安装可能会在默认 WSL 中安装 Node.js 和 unzip。
+          每次点击都会先检测夸克官方 Skill；检测到就直接授权，未检测到才会自动安装并继续授权。
+          首次安装可能会在默认 WSL 中安装 Node.js 和 unzip，不会回退到 Cookie 或逆向接口。
         </p>
         <button
           v-if="!quarkStatus?.available"

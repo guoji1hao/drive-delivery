@@ -64,13 +64,8 @@ pub fn clear_baidu_auth(state: State<'_, AppState>) -> AppResult<AuthStatus> {
 }
 
 #[tauri::command]
-pub async fn start_quark_auth(state: State<'_, AppState>) -> AppResult<String> {
-    state.quark.login().await
-}
-
-#[tauri::command]
-pub async fn install_and_start_quark_auth(state: State<'_, AppState>) -> AppResult<String> {
-    state.quark.install_official_component().await?;
+pub async fn ensure_and_start_quark_auth(state: State<'_, AppState>) -> AppResult<String> {
+    state.quark.ensure_official_skill().await?;
     state.quark.login().await
 }
 

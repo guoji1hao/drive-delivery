@@ -52,7 +52,7 @@
 
 官方仓库当前 README 描述了 `npx skills add`、`~/.quarkclouddrive/` 和全局 `quarkclouddrive` 命令，但同仓库安装脚本仍会清理旧全局命令，并把实际运行文件安装到 Skill 的 `scripts` 目录，两者存在版本发布时序差异。本项目不再让用户处理这种内部差异：Adapter 优先检测官方全局命令，再自动兼容常见 Skill 目录和 `~/.quarkclouddrive`，设置模型中没有夸克脚本路径字段。
 
-设置页“一键安装并绑定夸克”只从官方 GitHub 仓库下载 `install.sh`，由该官方脚本继续请求 `https://open-api-drive.quark.cn/agent/v1/skill_config` 获取官方发布包。缺少运行依赖时，应用会在默认 WSL 中安装 Node.js、curl 与 unzip。此安装桥接不是自创的网盘私有 API；上传、分享和登录仍由官方组件执行。
+设置页“检测并绑定夸克网盘”统一调用一个后端入口。该入口每次先检测可用的官方 Skill；只有缺失时才从官方 GitHub 仓库下载 `install.sh`，由该官方脚本继续请求 `https://open-api-drive.quark.cn/agent/v1/skill_config` 获取官方发布包。缺少运行依赖时，应用会在默认 WSL 中安装 Node.js、curl 与 unzip。此安装桥接不是自创的网盘私有 API；上传、分享和登录仍由官方组件执行。
 
 ## 后续接入原则
 

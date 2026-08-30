@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
         <section v-if="!tasks.length" class="first-run-note">
           <div>
             <strong>开始前请先完成平台授权</strong>
-            <p>百度使用官方 OAuth；夸克官方组件可一键安装并自动检测。未授权任务会保留为可重试状态。</p>
+            <p>百度使用官方 OAuth；夸克会先检测官方 Skill，缺失时自动安装。未授权任务会保留为可重试状态。</p>
           </div>
           <button class="small-button" @click="activeTab = 'settings'">前往设置</button>
         </section>
