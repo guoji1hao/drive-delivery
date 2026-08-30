@@ -25,6 +25,8 @@ export const api = {
     invoke<AuthPollResult>("poll_baidu_auth", { deviceCode }),
   clearBaiduAuth: () => invoke<AuthStatus>("clear_baidu_auth"),
   startQuarkAuth: () => invoke<string>("start_quark_auth"),
+  installAndStartQuarkAuth: () =>
+    invoke<string>("install_and_start_quark_auth"),
   pauseTask: (taskId: string, provider?: string) =>
     invoke<UploadTask>("pause_task", { taskId, provider }),
   cancelTask: (taskId: string, provider?: string) =>

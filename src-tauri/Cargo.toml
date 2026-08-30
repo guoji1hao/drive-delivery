@@ -1,6 +1,6 @@
 [package]
 name = "dual-drive-assistant"
-version = "0.1.0"
+version = "0.1.1"
 description = "百度网盘与夸克网盘并行上传和分享的 Windows 桌面工具"
 authors = ["双盘发货助手"]
 edition = "2024"

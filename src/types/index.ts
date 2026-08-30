@@ -83,7 +83,6 @@ export interface HistoryRecord {
 export interface AppSettings {
   baiduDefaultDir: string;
   quarkDefaultDir: string;
-  quarkCliScript: string;
   datedSubdirectory: boolean;
   maxConcurrentFiles: number;
   retryLimit: number;

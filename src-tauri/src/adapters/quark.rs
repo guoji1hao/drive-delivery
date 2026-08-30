@@ -3,12 +3,11 @@ use crate::{
     errors::{AppError, AppResult},
     logging::LogService,
     models::{AuthStatus, ShareResult},
-    settings::SettingsService,
 };
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value;
-use std::{path::PathBuf, process::Stdio, sync::Arc};
+use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, BufReader},
     process::Command,
@@ -16,63 +15,124 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 pub struct QuarkDriveAdapter {
-    settings: Arc<SettingsService>,
     log: Arc<LogService>,
     session_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum QuarkRuntime {
+    GlobalCommand,
+    NodeScript(String),
+}
+
 impl QuarkDriveAdapter {
-    pub fn new(settings: Arc<SettingsService>, log: Arc<LogService>) -> Self {
+    pub fn new(log: Arc<LogService>) -> Self {
         let random = uuid::Uuid::new_v4().simple().to_string();
         Self {
-            settings,
             log,
             session_id: format!("{}-{}", Utc::now().timestamp(), &random[..6]),
         }
     }
 
     pub async fn cli_available(&self) -> bool {
-        self.resolve_cli_script().await.is_ok()
+        self.resolve_runtime().await.is_ok()
     }
 
-    async fn resolve_cli_script(&self) -> AppResult<String> {
-        let configured = self.settings.get()?.quark_cli_script.trim().to_string();
-        let configured = if configured.is_empty() {
-            std::env::var("QUARK_CLI_SCRIPT").unwrap_or_default()
-        } else {
-            configured
-        };
-        if !configured.is_empty() {
-            let windows_path = PathBuf::from(&configured);
-            if windows_path.exists() {
-                return self.windows_to_wsl_path(&windows_path).await;
-            }
-            if configured.starts_with('/') {
-                return Ok(configured);
-            }
-            return Err(AppError::Unavailable(format!(
-                "配置的夸克官方 CLI 脚本不存在：{configured}"
-            )));
+    pub async fn install_official_component(&self) -> AppResult<String> {
+        if self.resolve_runtime().await.is_ok() {
+            return Ok("已检测到夸克官方组件，无需重复安装".to_string());
         }
 
+        self.log.info("quark", "开始安装夸克官方组件");
+        let dependencies = Command::new("wsl.exe")
+            .args([
+                "-u",
+                "root",
+                "-e",
+                "bash",
+                "-lc",
+                r#"set -e
+node_ok=false
+if command -v node >/dev/null 2>&1; then
+  major=$(node --version | sed 's/^v//' | cut -d. -f1)
+  if [ "${major:-0}" -ge 16 ]; then node_ok=true; fi
+fi
+if command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 && [ "$node_ok" = true ]; then exit 0; fi
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq curl unzip ca-certificates
+  if [ "$node_ok" != true ]; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y -qq nodejs
+  fi
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y curl unzip ca-certificates
+  if [ "$node_ok" != true ]; then
+    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    yum install -y nodejs
+  fi
+else
+  printf '当前 WSL 发行版不支持自动安装 Node.js 与 unzip' >&2
+  exit 1
+fi"#,
+            ])
+            .output();
+        let dependencies = tokio::time::timeout(Duration::from_secs(600), dependencies)
+            .await
+            .map_err(|_| AppError::Unavailable("安装 WSL 依赖超时，请稍后重试".to_string()))?
+            .map_err(|error| AppError::Unavailable(format!("无法调用 WSL：{error}")))?;
+        ensure_setup_success("安装 WSL 依赖", &dependencies)?;
+
+        let installer = Command::new("wsl.exe")
+            .args([
+                "-e",
+                "bash",
+                "-lc",
+                r#"set -euo pipefail
+install_dir="$HOME/.quarkclouddrive"
+mkdir -p "$install_dir"
+curl -fsSL --connect-timeout 30 --max-time 120 'https://raw.githubusercontent.com/quark-clouddrive/quarkclouddrive_offical/main/skills/quarkclouddrive/install.sh' -o "$install_dir/install.sh"
+chmod +x "$install_dir/install.sh"
+bash "$install_dir/install.sh""#,
+            ])
+            .output();
+        let installer = tokio::time::timeout(Duration::from_secs(600), installer)
+            .await
+            .map_err(|_| AppError::Unavailable("安装夸克官方组件超时，请稍后重试".to_string()))?
+            .map_err(|error| AppError::Unavailable(format!("无法调用 WSL：{error}")))?;
+        ensure_setup_success("安装夸克官方组件", &installer)?;
+        self.resolve_runtime().await?;
+        self.log.info("quark", "夸克官方组件安装完成");
+        Ok("夸克官方组件安装完成，正在打开授权流程".to_string())
+    }
+
+    async fn resolve_runtime(&self) -> AppResult<QuarkRuntime> {
         let output = Command::new("wsl.exe")
             .args([
                 "-e",
                 "bash",
                 "-lc",
-                r#"for f in "$HOME/.agents/skills/quarkclouddrive/scripts/quark-drive.cjs" "$HOME/.codex/skills/quarkclouddrive/scripts/quark-drive.cjs" "$HOME/.claude/skills/quarkclouddrive/scripts/quark-drive.cjs"; do if [ -f "$f" ]; then printf '%s' "$f"; exit 0; fi; done; exit 1"#,
+                r#"if command -v quarkclouddrive >/dev/null 2>&1; then printf 'command'; exit 0; fi
+for f in "$HOME/.agents/skills/quarkclouddrive/scripts/quark-drive.cjs" "$HOME/.codex/skills/quarkclouddrive/scripts/quark-drive.cjs" "$HOME/.claude/skills/quarkclouddrive/scripts/quark-drive.cjs"; do
+  if [ -f "$f" ]; then printf 'script:%s' "$f"; exit 0; fi
+done
+if [ -d "$HOME/.quarkclouddrive" ]; then
+  f=$(find "$HOME/.quarkclouddrive" -maxdepth 4 -type f -name quark-drive.cjs -print -quit 2>/dev/null)
+  if [ -n "$f" ]; then printf 'script:%s' "$f"; exit 0; fi
+fi
+exit 1"#,
             ])
             .output()
             .await
             .map_err(|error| AppError::Unavailable(format!("无法调用 WSL：{error}")))?;
         if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Ok(path);
+            if let Some(runtime) = parse_runtime_output(&String::from_utf8_lossy(&output.stdout)) {
+                return Ok(runtime);
             }
         }
         Err(AppError::Unavailable(
-            "未找到夸克官方 quark-drive.cjs；请按 README 在 WSL 安装官方 Skill，并在设置中填写脚本路径"
+            "未检测到夸克官方组件。请打开官方一键安装说明完成安装；安装后无需填写路径，直接点击绑定"
                 .to_string(),
         ))
     }
@@ -135,7 +195,7 @@ impl QuarkDriveAdapter {
         progress: Option<ProgressSink>,
         cancel: CancellationToken,
     ) -> AppResult<Vec<Value>> {
-        let script = self.resolve_cli_script().await?;
+        let runtime = self.resolve_runtime().await?;
         let operation = args.first().cloned().unwrap_or_else(|| "命令".to_string());
         args.extend([
             "--session-input".to_string(),
@@ -143,9 +203,18 @@ impl QuarkDriveAdapter {
             "--session-id".to_string(),
             self.session_id.clone(),
         ]);
-        let mut child = Command::new("wsl.exe")
-            .args(["-e", "bash", "-lc", "node \"$1\" \"${@:2}\"", "--"])
-            .arg(script)
+        let mut command = Command::new("wsl.exe");
+        match runtime {
+            QuarkRuntime::GlobalCommand => {
+                command.args(["-e", "bash", "-lc", "exec quarkclouddrive \"$@\"", "--"]);
+            }
+            QuarkRuntime::NodeScript(script) => {
+                command
+                    .args(["-e", "bash", "-lc", "exec node \"$1\" \"${@:2}\"", "--"])
+                    .arg(script);
+            }
+        }
+        let mut child = command
             .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -268,7 +337,8 @@ impl DriveAdapter for QuarkDriveAdapter {
                 authenticated: false,
                 available: false,
                 expires_at: None,
-                message: "未找到夸克官方 Skill CLI；当前官方仅支持 Windows WSL".to_string(),
+                message: "未检测到夸克官方组件；无需填写路径，可从设置页打开官方一键安装说明"
+                    .to_string(),
             });
         }
         let result = self
@@ -284,7 +354,7 @@ impl DriveAdapter for QuarkDriveAdapter {
             available: true,
             expires_at: None,
             message: match result {
-                Ok(_) => "夸克官方 CLI 已授权".to_string(),
+                Ok(_) => "夸克官方组件已自动检测并完成授权".to_string(),
                 Err(error) => error.to_string(),
             },
         })
@@ -450,6 +520,35 @@ fn result_message(values: &[Value]) -> Option<String> {
     })
 }
 
+fn ensure_setup_success(label: &str, output: &std::process::Output) -> AppResult<()> {
+    if output.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let detail = stderr
+        .lines()
+        .rev()
+        .chain(stdout.lines().rev())
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("未知错误")
+        .trim();
+    let detail: String = detail.chars().take(300).collect();
+    Err(AppError::Unavailable(format!("{label}失败：{detail}")))
+}
+
+fn parse_runtime_output(output: &str) -> Option<QuarkRuntime> {
+    let value = output.trim();
+    if value == "command" {
+        Some(QuarkRuntime::GlobalCommand)
+    } else {
+        value
+            .strip_prefix("script:")
+            .filter(|path| !path.trim().is_empty())
+            .map(|path| QuarkRuntime::NodeScript(path.trim().to_string()))
+    }
+}
+
 fn period_to_expired_type(days: u32) -> u32 {
     match days {
         0 => 1,
@@ -464,12 +563,27 @@ fn period_to_expired_type(days: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::period_to_expired_type;
+    use super::{QuarkRuntime, parse_runtime_output, period_to_expired_type};
 
     #[test]
     fn share_period_uses_supported_quark_values() {
         assert_eq!(period_to_expired_type(0), 1);
         assert_eq!(period_to_expired_type(30), 4);
         assert_eq!(period_to_expired_type(365), 7);
+    }
+
+    #[test]
+    fn runtime_detection_accepts_command_and_script_modes() {
+        assert_eq!(
+            parse_runtime_output("command\n"),
+            Some(QuarkRuntime::GlobalCommand)
+        );
+        assert_eq!(
+            parse_runtime_output("script:/home/demo/quark-drive.cjs"),
+            Some(QuarkRuntime::NodeScript(
+                "/home/demo/quark-drive.cjs".to_string()
+            ))
+        );
+        assert_eq!(parse_runtime_output("script:   "), None);
     }
 }

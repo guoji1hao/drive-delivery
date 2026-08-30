@@ -110,7 +110,9 @@ async function clearBaidu() {
 async function authorizeQuark() {
   busy.value = "quark";
   try {
-    const message = await api.startQuarkAuth();
+    const message = quarkStatus.value?.available
+      ? await api.startQuarkAuth()
+      : await api.installAndStartQuarkAuth();
     emit("authChanged", {
       provider: "quark",
       authenticated: true,
@@ -188,23 +190,32 @@ async function authorizeQuark() {
           </span>
         </div>
         <p>{{ quarkStatus?.message }}</p>
-        <label>
-          <span>官方 CLI 脚本路径</span>
-          <input
-            v-model="form.quarkCliScript"
-            placeholder="例如 /home/user/.agents/skills/quarkclouddrive/scripts/quark-drive.cjs"
-          />
-        </label>
         <button
           class="small-button"
           :disabled="busy === 'quark'"
           @click="authorizeQuark"
         >
-          {{ busy === "quark" ? "等待官方授权…" : "调用官方 CLI 授权" }}
+          {{
+            busy === "quark"
+              ? quarkStatus?.available
+                ? "等待官方授权…"
+                : "正在安装并授权…"
+              : quarkStatus?.available
+                ? "绑定夸克网盘"
+                : "一键安装并绑定夸克"
+          }}
         </button>
         <p class="field-help">
-          填写 WSL 内 quark-drive.cjs 的绝对路径后先保存设置。留空时会自动检查常见全局 Skill 目录；不会回退到 Cookie 或逆向接口。
+          应用会自动检测夸克官方组件，不再要求填写脚本路径，也不会回退到 Cookie 或逆向接口。
+          首次一键安装可能会在默认 WSL 中安装 Node.js 和 unzip。
         </p>
+        <button
+          v-if="!quarkStatus?.available"
+          class="text-button"
+          @click="openUrl('https://github.com/quark-clouddrive/quarkclouddrive_offical')"
+        >
+          未安装？打开官方一键安装说明
+        </button>
       </section>
 
       <section class="settings-card form-card">

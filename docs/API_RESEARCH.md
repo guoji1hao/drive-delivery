@@ -33,13 +33,14 @@
 
 | 能力 | 当前确认结果 | MVP 处理 |
 | --- | --- | --- |
-| OAuth | 官方 CLI `login` 启动浏览器 OAuth | 通过 WSL 调用官方 CLI |
-| Token Refresh | 由官方 CLI/SDK 维护登录态；公开文档未要求应用直接处理 Token | 不读取 Token，不保存 Cookie |
-| 上传 | 官方 CLI `upload` 支持文件与文件夹 | 任务管理器逐文件调用，保留独立状态 |
+| OAuth | 官方组件 `login` 启动浏览器 OAuth | 通过 WSL 调用；无需用户填写路径 |
+| Token Refresh | 由官方组件维护登录态；公开文档未要求应用直接处理 Token | 不读取 Token，不保存 Cookie |
+| 桌面应用直连 REST API | 当前未找到公开的 Client ID 注册入口、OAuth 端点与完整 REST 契约 | 不猜测端点；保留 Adapter 以便未来替换 |
+| 上传 | 官方组件 `upload` 支持文件与文件夹 | 任务管理器逐文件调用，保留独立状态 |
 | 真实进度 | CLI 输出 NDJSON `current/total/percent` | 逐行解析并显示 |
 | 秒传 | 结果返回 `instantUpload` | 已识别并记录 |
 | 断点续传 | `upload list`、`upload resume --record-id` | 保存 recordId 并调用 resume |
-| 文件列表/搜索 | 官方 CLI 提供搜索与文件浏览能力 | MVP 上传链路暂未调用 |
+| 文件列表/搜索 | 官方组件提供搜索与文件浏览能力 | MVP 上传链路暂未调用 |
 | 创建目录 | `create-folder --dir-path`，同名创建幂等 | 上传前创建或取得目标目录 FID |
 | 创建分享 | `share <FID...>` | 已实现公开链接 |
 | 分享有效期 | 1=永久，2=1天，3=7天，4=30天，5=60天，6=100天，7=180天 | 设置值映射到官方枚举 |
@@ -47,9 +48,11 @@
 | 分享取消 | 当前公开 Skill 文档未确认提供面向已创建分享的取消命令 | 不实现、不猜测 |
 | 限流规则 | 当前文档未确认固定通用阈值 | 不写死，失败有限重试 |
 | 单文件大小限制 | 当前文档未确认统一固定值 | 不写死，展示服务端真实错误 |
-| Windows 支持 | 官方表格：Windows WSL amd64 支持，Windows 原生不支持 | 使用 `wsl.exe` 调用脚本；缺失时 Adapter 不可用 |
+| Windows 支持 | 官方表格：Windows WSL amd64 支持，Windows 原生不支持 | 使用 `wsl.exe` 调用；缺失时支持一键安装官方组件 |
 
-官方 v1.0.15 入口是 Skill 目录内的 `node scripts/quark-drive.cjs`，安装脚本会清理旧版全局 `quarkclouddrive` 命令。本项目因此使用可配置脚本路径，不依赖旧命令名。
+官方仓库当前 README 描述了 `npx skills add`、`~/.quarkclouddrive/` 和全局 `quarkclouddrive` 命令，但同仓库安装脚本仍会清理旧全局命令，并把实际运行文件安装到 Skill 的 `scripts` 目录，两者存在版本发布时序差异。本项目不再让用户处理这种内部差异：Adapter 优先检测官方全局命令，再自动兼容常见 Skill 目录和 `~/.quarkclouddrive`，设置模型中没有夸克脚本路径字段。
+
+设置页“一键安装并绑定夸克”只从官方 GitHub 仓库下载 `install.sh`，由该官方脚本继续请求 `https://open-api-drive.quark.cn/agent/v1/skill_config` 获取官方发布包。缺少运行依赖时，应用会在默认 WSL 中安装 Node.js、curl 与 unzip。此安装桥接不是自创的网盘私有 API；上传、分享和登录仍由官方组件执行。
 
 ## 后续接入原则
 

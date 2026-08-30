@@ -145,8 +145,6 @@ impl From<&UploadTask> for HistoryRecord {
 pub struct AppSettings {
     pub baidu_default_dir: String,
     pub quark_default_dir: String,
-    #[serde(default)]
-    pub quark_cli_script: String,
     pub dated_subdirectory: bool,
     pub max_concurrent_files: u32,
     pub retry_limit: u32,
@@ -160,7 +158,6 @@ impl Default for AppSettings {
         Self {
             baidu_default_dir: "/apps/双盘发货助手/自动发货/".to_string(),
             quark_default_dir: "/自动发货/".to_string(),
-            quark_cli_script: String::new(),
             dated_subdirectory: false,
             max_concurrent_files: 2,
             retry_limit: 3,

@@ -40,7 +40,7 @@ impl AppState {
         let settings = Arc::new(SettingsService::new(database.clone()));
         let auth = Arc::new(AuthManager::new(database.clone(), log.clone())?);
         let baidu = Arc::new(BaiduDriveAdapter::new(auth.clone(), log.clone())?);
-        let quark = Arc::new(QuarkDriveAdapter::new(settings.clone(), log.clone()));
+        let quark = Arc::new(QuarkDriveAdapter::new(log.clone()));
         let tasks = Arc::new(TaskManager::new(
             app,
             database.clone(),

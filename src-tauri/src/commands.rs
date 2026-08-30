@@ -18,7 +18,7 @@ pub async fn initialize_app(state: State<'_, AppState>) -> AppResult<AppSnapshot
         authenticated: false,
         available: false,
         expires_at: None,
-        message: "夸克官方 CLI 状态检查失败".to_string(),
+        message: "夸克官方组件状态检查失败".to_string(),
     });
     Ok(AppSnapshot {
         tasks: state.tasks.list_tasks()?,
@@ -65,6 +65,12 @@ pub fn clear_baidu_auth(state: State<'_, AppState>) -> AppResult<AuthStatus> {
 
 #[tauri::command]
 pub async fn start_quark_auth(state: State<'_, AppState>) -> AppResult<String> {
+    state.quark.login().await
+}
+
+#[tauri::command]
+pub async fn install_and_start_quark_auth(state: State<'_, AppState>) -> AppResult<String> {
+    state.quark.install_official_component().await?;
     state.quark.login().await
 }
 
@@ -145,13 +151,14 @@ fn capability_reports() -> Vec<CapabilityReport> {
         },
         CapabilityReport {
             provider: "quark".to_string(),
-            oauth: "夸克官方 Skill/CLI 浏览器 OAuth".to_string(),
-            upload: "官方 CLI 上传、秒传与 NDJSON 真实进度".to_string(),
-            resume: "官方 CLI upload list/resume 任务恢复".to_string(),
-            share: "官方 CLI share，支持公开/私密链接和永久至 180 天有效期".to_string(),
+            oauth: "夸克官方组件浏览器 OAuth；应用自动检测，无需配置路径".to_string(),
+            upload: "官方组件上传、秒传与 NDJSON 真实进度".to_string(),
+            resume: "官方组件 upload list/resume 任务恢复".to_string(),
+            share: "官方组件 share，支持公开/私密链接和永久至 180 天有效期".to_string(),
             limitations: vec![
                 "官方 2026-08 版本仅支持 Windows WSL，不支持原生 Windows".to_string(),
-                "未安装官方 CLI 时 Adapter 会保持不可用，不会调用私有 Cookie API".to_string(),
+                "当前未找到面向普通桌面应用公开的 Client ID 注册与直连 REST API 文档".to_string(),
+                "未安装官方组件时 Adapter 会保持不可用，不会调用私有 Cookie API".to_string(),
             ],
         },
     ]
