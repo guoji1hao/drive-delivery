@@ -25,6 +25,8 @@ const emit = defineEmits<{
 const form = reactive<AppSettings>({ ...props.settings });
 const appKey = ref("");
 const secretKey = ref("");
+const googleClientId = ref("");
+const googleClientSecret = ref("");
 const busy = ref<string>();
 const authCode = ref<string>();
 
@@ -35,6 +37,9 @@ watch(
 
 const baiduStatus = computed(() =>
   props.auth.find((item) => item.provider === "baidu"),
+);
+const googleStatus = computed(() =>
+  props.auth.find((item) => item.provider === "google"),
 );
 
 async function save() {
@@ -62,6 +67,7 @@ async function authorizeBaidu() {
       appKey.value,
       secretKey.value,
     );
+    secretKey.value = "";
     emit("authChanged", configured);
     const challenge = await api.startBaiduAuth();
     authCode.value = challenge.userCode;
@@ -104,6 +110,57 @@ async function clearBaidu() {
   }
 }
 
+async function authorizeGoogle() {
+  if (!googleClientId.value.trim()) {
+    emit("toast", "请先填写 Google OAuth Client ID");
+    return;
+  }
+  busy.value = "google";
+  try {
+    const configured = await api.saveGoogleCredentials(
+      googleClientId.value,
+      googleClientSecret.value.trim() || undefined,
+    );
+    googleClientSecret.value = "";
+    emit("authChanged", configured);
+    const challenge = await api.startGoogleAuth();
+    await openUrl(challenge.verificationUrl);
+    const expiresAt = Date.now() + challenge.expiresIn * 1000;
+    while (Date.now() < expiresAt) {
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, challenge.interval * 1000),
+      );
+      const result = await api.pollGoogleAuth(challenge.deviceCode);
+      if (result.authenticated) {
+        emit("authChanged", {
+          provider: "google",
+          authenticated: true,
+          available: true,
+          expiresAt: result.expiresAt,
+          message: result.message,
+        });
+        emit("toast", result.message);
+        return;
+      }
+    }
+    emit("toast", "Google 授权已超时，请重新发起授权");
+  } catch (error) {
+    emit("toast", String(error));
+  } finally {
+    busy.value = undefined;
+  }
+}
+
+async function clearGoogle() {
+  try {
+    const status = await api.clearGoogleAuth();
+    emit("authChanged", status);
+    emit("toast", "已清除本机 Google 授权，可重新绑定");
+  } catch (error) {
+    emit("toast", String(error));
+  }
+}
+
 </script>
 
 <template>
@@ -112,7 +169,7 @@ async function clearBaidu() {
       <div>
         <span class="eyebrow">安全与偏好</span>
         <h2>设置</h2>
-        <p>Token 不写入数据库；百度敏感凭据保存在 Windows 凭据管理器。</p>
+        <p>Token 不写入数据库；百度与 Google 敏感凭据均保存在 Windows 凭据管理器。</p>
       </div>
       <button class="primary-button" :disabled="busy === 'settings'" @click="save">
         {{ busy === "settings" ? "保存中…" : "保存设置" }}
@@ -157,12 +214,56 @@ async function clearBaidu() {
         </button>
       </section>
 
+      <section class="settings-card auth-card">
+        <div class="card-title-row">
+          <div>
+            <span class="provider-dot google" />
+            <strong>Google Drive 授权</strong>
+          </div>
+          <span class="status-chip" :class="{ online: googleStatus?.authenticated }">
+            {{ googleStatus?.authenticated ? "已授权" : "未授权" }}
+          </span>
+        </div>
+        <p>{{ googleStatus?.message }}</p>
+        <template v-if="!googleStatus?.authenticated">
+          <label>
+            <span>OAuth Client ID</span>
+            <input
+              v-model="googleClientId"
+              autocomplete="off"
+              placeholder="桌面应用 Client ID"
+            />
+          </label>
+          <label>
+            <span>Client Secret（可选）</span>
+            <input
+              v-model="googleClientSecret"
+              type="password"
+              autocomplete="new-password"
+              placeholder="若凭据 JSON 中存在则填写"
+            />
+          </label>
+          <p class="field-help">使用系统浏览器和随机 127.0.0.1 回调，无需手工填写回调路径。</p>
+          <button class="small-button" :disabled="busy === 'google'" @click="authorizeGoogle">
+            {{ busy === "google" ? "等待浏览器授权…" : "绑定 Google Drive" }}
+          </button>
+        </template>
+        <button v-else class="text-button danger-text" @click="clearGoogle">
+          清除授权并重新绑定
+        </button>
+      </section>
+
       <section class="settings-card form-card">
         <h3>上传目录</h3>
         <label>
           <span>百度默认目录</span>
           <input v-model="form.baiduDefaultDir" />
           <small>必须位于开放平台分配的 /apps/应用目录/ 下</small>
+        </label>
+        <label>
+          <span>Google Drive 默认目录</span>
+          <input v-model="form.googleDefaultDir" />
+          <small>程序会在 My Drive 中按层级查找或创建目录</small>
         </label>
         <label class="check-row">
           <input v-model="form.datedSubdirectory" type="checkbox" />
@@ -201,7 +302,7 @@ async function clearBaidu() {
         <h3>复制文本模板</h3>
         <textarea v-model="form.copyTemplate" rows="7" />
         <p class="field-help">
-          可用变量：{filename}、{baidu_url}、{baidu_code_line}
+          可用变量：{filename}、{baidu_url}、{baidu_code_line}、{google_url}、{google_code_line}
         </p>
       </section>
 
@@ -220,7 +321,7 @@ async function clearBaidu() {
       <h3>当前 Adapter 实现依据</h3>
       <div class="capability-grid">
         <article v-for="item in capabilities" :key="item.provider">
-          <strong>百度网盘</strong>
+          <strong>{{ item.provider === "baidu" ? "百度网盘" : "Google Drive" }}</strong>
           <p>{{ item.oauth }}</p>
           <p>{{ item.upload }}</p>
           <p>{{ item.resume }}</p>

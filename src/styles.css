@@ -428,7 +428,7 @@ a {
 .platform-grid,
 .result-grid,
 .capability-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .platform-grid {
@@ -493,6 +493,10 @@ a {
 
 .provider-dot.baidu {
   background: #316ee8;
+}
+
+.provider-dot.google {
+  background: linear-gradient(135deg, #4285f4 0 45%, #34a853 45% 70%, #fbbc04 70%);
 }
 
 .state-label {
@@ -876,6 +880,17 @@ a {
   line-height: 1.55;
 }
 
+.copy-all-button {
+  margin-top: 12px;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
 .limit-note {
   padding-left: 9px;
   border-left: 2px solid #e09a63;
@@ -944,5 +959,14 @@ a {
   .tasks-page,
   .page-panel {
     width: calc(100% - 40px);
+  }
+}
+
+@media (max-width: 760px) {
+  .platform-grid,
+  .result-grid,
+  .settings-grid,
+  .capability-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

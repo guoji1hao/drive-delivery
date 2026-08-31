@@ -76,7 +76,7 @@ impl BaiduDriveAdapter {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(20))
             .timeout(Duration::from_secs(180))
-            .user_agent("dual-drive-assistant/0.1.0")
+            .user_agent("dual-drive-assistant/0.2.0")
             .build()?;
         Ok(Self { auth, client, log })
     }

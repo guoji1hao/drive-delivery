@@ -12,6 +12,7 @@ import type {
   AppSettings,
   AppSnapshot,
   AuthStatus,
+  Provider,
   UploadTask,
 } from "./types";
 
@@ -68,37 +69,47 @@ async function enqueue(paths: string[]) {
 async function control(
   action: "pause" | "retry" | "cancel",
   taskId: string,
+  provider: Provider,
 ) {
   try {
-    const task = await api[`${action}Task`](taskId);
+    const handler = {
+      pause: api.pauseTask,
+      retry: api.retryTask,
+      cancel: api.cancelTask,
+    }[action];
+    const task = await handler(taskId, provider);
     updateTask(task);
     showToast(
-      action === "pause" ? "任务已暂停" : action === "cancel" ? "任务已取消" : "已重新执行百度任务",
+      action === "pause"
+        ? "该平台任务已暂停"
+        : action === "cancel"
+          ? "该平台任务已取消"
+          : `已重新执行${provider === "baidu" ? "百度" : "Google"}任务`,
     );
   } catch (error) {
     showToast(String(error));
   }
 }
 
-async function copy(taskId: string) {
+async function copy(taskId: string, provider: Provider | "all") {
   try {
-    await api.copyTaskResult(taskId);
-    showToast("百度分享信息已复制");
+    await api.copyTaskResult(taskId, provider);
+    showToast(provider === "all" ? "双盘分享信息已复制" : "平台分享信息已复制");
   } catch (error) {
     showToast(String(error));
   }
 }
 
-function pauseTask(taskId: string) {
-  return control("pause", taskId);
+function pauseTask(taskId: string, provider: Provider) {
+  return control("pause", taskId, provider);
 }
 
-function retryTask(taskId: string) {
-  return control("retry", taskId);
+function retryTask(taskId: string, provider: Provider) {
+  return control("retry", taskId, provider);
 }
 
-function cancelTask(taskId: string) {
-  return control("cancel", taskId);
+function cancelTask(taskId: string, provider: Provider) {
+  return control("cancel", taskId, provider);
 }
 
 function replaceAuth(status: AuthStatus) {
@@ -150,7 +161,7 @@ onBeforeUnmount(() => {
         <span class="brand-mark"><i /><i /></span>
         <span>
           <strong>双盘发货助手</strong>
-          <small>BAIDU DRIVE DELIVERY</small>
+          <small>BAIDU + GOOGLE DELIVERY</small>
         </span>
       </button>
       <nav>
@@ -183,8 +194,8 @@ onBeforeUnmount(() => {
       <div v-show="activeTab === 'tasks'" class="tasks-page">
         <section class="hero-copy">
           <span class="eyebrow">一次拖入 · 自动上传</span>
-          <h1>把交付资料，稳稳送到百度网盘。</h1>
-          <p>支持大文件分片、真实进度、断点续传、失败重试和本地历史去重。</p>
+          <h1>一次拖入，同时送达两个网盘。</h1>
+          <p>百度网盘与 Google Drive 并行上传，支持真实进度、断点续传、独立重试和历史去重。</p>
         </section>
         <DropZone :active="dragActive" :busy="enqueueBusy" />
         <TaskList
@@ -197,7 +208,7 @@ onBeforeUnmount(() => {
         <section v-if="!tasks.length" class="first-run-note">
           <div>
             <strong>开始前请先完成平台授权</strong>
-            <p>百度使用官方 OAuth。未授权任务会保留为可重试状态，不会伪造上传或分享结果。</p>
+            <p>百度和 Google 均使用官方 OAuth。未授权平台会保留为可重试状态，不会伪造上传或分享结果。</p>
           </div>
           <button class="small-button" @click="activeTab = 'settings'">前往设置</button>
         </section>

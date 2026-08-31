@@ -1,23 +1,27 @@
 <script setup lang="ts">
-import type { UploadTask } from "../types";
+import type { Provider, UploadTask } from "../types";
 import { formatDate } from "../utils/format";
 
 defineProps<{ task: UploadTask }>();
 const emit = defineEmits<{
-  copy: [];
+  copy: [provider: Provider | "all"];
 }>();
 </script>
 
 <template>
   <section
-    v-if="task.baidu.share.url || task.baidu.share.notice"
+    v-if="task.baidu.share.url || task.baidu.share.notice || task.google.share.url || task.google.share.notice"
     class="result-card"
   >
     <div class="result-grid">
       <div class="share-block">
         <div class="share-title">
           <strong>百度网盘</strong>
-          <button class="copy-link" @click="emit('copy')">复制分享信息</button>
+          <button
+            class="copy-link"
+            :disabled="!task.baidu.share.url && !task.baidu.share.notice"
+            @click="emit('copy', 'baidu')"
+          >复制百度</button>
         </div>
         <a
           v-if="task.baidu.share.url"
@@ -33,6 +37,29 @@ const emit = defineEmits<{
         </div>
       </div>
 
+      <div class="share-block">
+        <div class="share-title">
+          <strong>Google Drive</strong>
+          <button
+            class="copy-link"
+            :disabled="!task.google.share.url && !task.google.share.notice"
+            @click="emit('copy', 'google')"
+          >复制 Google</button>
+        </div>
+        <a
+          v-if="task.google.share.url"
+          :href="task.google.share.url"
+          target="_blank"
+        >
+          {{ task.google.share.url }}
+        </a>
+        <p v-else class="share-notice">{{ task.google.share.notice || "暂未生成分享链接" }}</p>
+        <div v-if="task.google.share.url" class="share-meta">
+          <span v-if="task.google.share.code">提取码：{{ task.google.share.code }}</span>
+          <span>有效期：{{ formatDate(task.google.share.expiresAt) }}</span>
+        </div>
+      </div>
     </div>
+    <button class="primary-button copy-all-button" @click="emit('copy', 'all')">复制全部</button>
   </section>
 </template>

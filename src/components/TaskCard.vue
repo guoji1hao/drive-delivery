@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { UploadTask } from "../types";
+import type { Provider, UploadTask } from "../types";
 import { formatBytes, taskStateText } from "../utils/format";
 import PlatformProgress from "./PlatformProgress.vue";
 import ResultCard from "./ResultCard.vue";
 
 defineProps<{ task: UploadTask }>();
 const emit = defineEmits<{
-  pause: [taskId: string];
-  retry: [taskId: string];
-  cancel: [taskId: string];
-  copy: [taskId: string];
+  pause: [taskId: string, provider: Provider];
+  retry: [taskId: string, provider: Provider];
+  cancel: [taskId: string, provider: Provider];
+  copy: [taskId: string, provider: Provider | "all"];
 }>();
 </script>
 
@@ -35,16 +35,25 @@ const emit = defineEmits<{
     <div class="platform-grid">
       <PlatformProgress
         name="百度网盘"
+        provider="baidu"
         :value="task.baidu"
-        @pause="emit('pause', task.id)"
-        @retry="emit('retry', task.id)"
-        @cancel="emit('cancel', task.id)"
+        @pause="emit('pause', task.id, 'baidu')"
+        @retry="emit('retry', task.id, 'baidu')"
+        @cancel="emit('cancel', task.id, 'baidu')"
+      />
+      <PlatformProgress
+        name="Google Drive"
+        provider="google"
+        :value="task.google"
+        @pause="emit('pause', task.id, 'google')"
+        @retry="emit('retry', task.id, 'google')"
+        @cancel="emit('cancel', task.id, 'google')"
       />
     </div>
 
     <ResultCard
       :task="task"
-      @copy="emit('copy', task.id)"
+      @copy="(provider) => emit('copy', task.id, provider)"
     />
   </article>
 </template>

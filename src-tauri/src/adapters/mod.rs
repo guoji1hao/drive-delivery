@@ -1,4 +1,5 @@
 pub mod baidu;
+pub mod google;
 
 use crate::{
     errors::AppResult,

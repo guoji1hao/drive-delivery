@@ -5,10 +5,13 @@ use crate::{
     models::{AuthChallenge, AuthPollResult, AuthStatus, ProviderCredentialsInput},
     secret_store::SecretStore,
 };
+mod google;
+
 use chrono::Utc;
 use reqwest::Client;
 use serde::Deserialize;
-use std::{env, sync::Arc, time::Duration};
+use std::{collections::HashMap, env, sync::Arc, time::Duration};
+use tokio::sync::Mutex as AsyncMutex;
 
 const OAUTH_DEVICE_CODE_URL: &str = "https://openapi.baidu.com/oauth/2.0/device/code";
 const OAUTH_TOKEN_URL: &str = "https://openapi.baidu.com/oauth/2.0/token";
@@ -23,6 +26,13 @@ pub struct AuthManager {
     secrets: SecretStore,
     client: Client,
     log: Arc<LogService>,
+    google_pending: AsyncMutex<HashMap<String, GooglePendingAuth>>,
+}
+
+pub(super) struct GooglePendingAuth {
+    pub expires_at: i64,
+    pub result: Option<AuthPollResult>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,13 +64,14 @@ impl AuthManager {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(15))
             .timeout(Duration::from_secs(45))
-            .user_agent("dual-drive-assistant/0.1.0")
+            .user_agent("dual-drive-assistant/0.2.0")
             .build()?;
         Ok(Self {
             database,
             secrets: SecretStore,
             client,
             log,
+            google_pending: AsyncMutex::new(HashMap::new()),
         })
     }
 

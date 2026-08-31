@@ -20,6 +20,8 @@ export type TaskState =
   | "failed"
   | "duplicate";
 
+export type Provider = "baidu" | "google";
+
 export interface ShareResult {
   url?: string;
   code?: string;
@@ -55,6 +57,7 @@ export interface UploadTask {
   state: TaskState;
   message?: string;
   baidu: PlatformTask;
+  google: PlatformTask;
 }
 
 export interface HistoryRecord {
@@ -71,10 +74,17 @@ export interface HistoryRecord {
   baiduCode?: string;
   baiduExpiresAt?: number;
   baiduShareId?: string;
+  googlePath?: string;
+  googleRemoteId?: string;
+  googleUrl?: string;
+  googleCode?: string;
+  googleExpiresAt?: number;
+  googleShareId?: string;
 }
 
 export interface AppSettings {
   baiduDefaultDir: string;
+  googleDefaultDir: string;
   datedSubdirectory: boolean;
   maxConcurrentFiles: number;
   retryLimit: number;
@@ -84,7 +94,7 @@ export interface AppSettings {
 }
 
 export interface AuthStatus {
-  provider: "baidu";
+  provider: Provider;
   authenticated: boolean;
   available: boolean;
   expiresAt?: number;
@@ -108,7 +118,7 @@ export interface AuthPollResult {
 }
 
 export interface CapabilityReport {
-  provider: "baidu";
+  provider: Provider;
   oauth: string;
   upload: string;
   resume: string;

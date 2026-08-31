@@ -63,6 +63,9 @@ fn redact(input: &str) -> String {
         || lower.contains("authorization")
         || lower.contains("password")
         || lower.contains("cookie")
+        || lower.contains("upload_id")
+        || lower.contains("uploadid")
+        || lower.contains("session_uri")
     {
         "敏感认证信息已隐藏".to_string()
     } else {
@@ -84,6 +87,7 @@ mod tests {
     fn sensitive_values_are_not_logged() {
         assert_eq!(redact("access_token=secret"), "敏感认证信息已隐藏");
         assert_eq!(redact("Authorization: Bearer value"), "敏感认证信息已隐藏");
+        assert_eq!(redact("upload_id=resume-secret"), "敏感认证信息已隐藏");
         assert_eq!(redact("普通上传错误"), "普通上传错误");
     }
 }

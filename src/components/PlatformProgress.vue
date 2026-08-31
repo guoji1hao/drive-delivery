@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { PlatformTask } from "../types";
+import type { PlatformTask, Provider } from "../types";
 import {
   canRetry,
   formatBytes,
@@ -10,6 +10,7 @@ import {
 
 const props = defineProps<{
   name: string;
+  provider: Provider;
   value: PlatformTask;
 }>();
 
@@ -33,7 +34,7 @@ const tone = computed(() => {
   <article class="platform-panel" :class="tone">
     <header>
       <div class="provider-name">
-        <span class="provider-dot baidu" />
+        <span class="provider-dot" :class="provider" />
         <strong>{{ name }}</strong>
       </div>
       <span class="state-label">{{ platformStateText[value.state] }}</span>

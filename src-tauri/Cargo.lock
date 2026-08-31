@@ -930,10 +930,11 @@ checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
 
 [[package]]
 name = "dual-drive-assistant"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "arboard",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "dotenvy",
  "futures-util",
@@ -952,6 +953,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
+ "url",
  "urlencoding",
  "uuid",
  "walkdir",

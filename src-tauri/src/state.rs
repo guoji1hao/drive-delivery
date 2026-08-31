@@ -1,6 +1,11 @@
 use crate::{
-    adapters::baidu::BaiduDriveAdapter, auth::AuthManager, database::Database, errors::AppResult,
-    logging::LogService, settings::SettingsService, task_manager::TaskManager,
+    adapters::{baidu::BaiduDriveAdapter, google::GoogleDriveAdapter},
+    auth::AuthManager,
+    database::Database,
+    errors::AppResult,
+    logging::LogService,
+    settings::SettingsService,
+    task_manager::TaskManager,
 };
 use std::{fs, path::PathBuf, sync::Arc};
 use tauri::{AppHandle, Manager};
@@ -34,11 +39,13 @@ impl AppState {
         let settings = Arc::new(SettingsService::new(database.clone()));
         let auth = Arc::new(AuthManager::new(database.clone(), log.clone())?);
         let baidu = Arc::new(BaiduDriveAdapter::new(auth.clone(), log.clone())?);
+        let google = Arc::new(GoogleDriveAdapter::new(auth.clone(), log.clone())?);
         let tasks = Arc::new(TaskManager::new(
             app,
             database.clone(),
             settings.clone(),
             baidu,
+            google,
             log.clone(),
         ));
         log.info("app", "双盘发货助手启动完成");

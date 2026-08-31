@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import type { HistoryRecord } from "../types";
+import type { HistoryRecord, Provider } from "../types";
 import { api } from "../services/api";
 import { formatBytes, formatDate, taskStateText } from "../utils/format";
 
@@ -21,9 +21,9 @@ async function search() {
   }
 }
 
-async function copy(record: HistoryRecord) {
+async function copy(record: HistoryRecord, provider: Provider | "all") {
   try {
-    await api.copyHistoryResult(record);
+    await api.copyHistoryResult(record, provider);
     emit("toast", "历史分享文案已复制");
   } catch (error) {
     emit("toast", String(error));
@@ -64,6 +64,7 @@ onMounted(search);
             <th>文件</th>
             <th>上传时间</th>
             <th>百度</th>
+            <th>Google</th>
             <th>状态</th>
             <th />
           </tr>
@@ -79,15 +80,23 @@ onMounted(search);
               <a v-if="record.baiduUrl" :href="record.baiduUrl" target="_blank">已生成</a>
               <span v-else>无链接</span>
             </td>
+            <td>
+              <a v-if="record.googleUrl" :href="record.googleUrl" target="_blank">已生成</a>
+              <span v-else>无链接</span>
+            </td>
             <td>{{ taskStateText[record.taskStatus] }}</td>
             <td>
-              <button
-                class="small-button"
-                :disabled="!record.baiduUrl"
-                @click="copy(record)"
-              >
-                复制分享
-              </button>
+              <div class="history-actions">
+                <button class="copy-link" :disabled="!record.baiduUrl" @click="copy(record, 'baidu')">百度</button>
+                <button class="copy-link" :disabled="!record.googleUrl" @click="copy(record, 'google')">Google</button>
+                <button
+                  class="small-button"
+                  :disabled="!record.baiduUrl && !record.googleUrl"
+                  @click="copy(record, 'all')"
+                >
+                  复制全部
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>

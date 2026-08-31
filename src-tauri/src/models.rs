@@ -73,6 +73,12 @@ impl PlatformTask {
     }
 }
 
+impl Default for PlatformTask {
+    fn default() -> Self {
+        Self::waiting(0)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadTask {
@@ -87,6 +93,8 @@ pub struct UploadTask {
     pub state: TaskState,
     pub message: Option<String>,
     pub baidu: PlatformTask,
+    #[serde(default)]
+    pub google: PlatformTask,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,6 +113,12 @@ pub struct HistoryRecord {
     pub baidu_code: Option<String>,
     pub baidu_expires_at: Option<i64>,
     pub baidu_share_id: Option<String>,
+    pub google_path: Option<String>,
+    pub google_remote_id: Option<String>,
+    pub google_url: Option<String>,
+    pub google_code: Option<String>,
+    pub google_expires_at: Option<i64>,
+    pub google_share_id: Option<String>,
 }
 
 impl From<&UploadTask> for HistoryRecord {
@@ -123,14 +137,21 @@ impl From<&UploadTask> for HistoryRecord {
             baidu_code: task.baidu.share.code.clone(),
             baidu_expires_at: task.baidu.share.expires_at,
             baidu_share_id: task.baidu.share.share_id.clone(),
+            google_path: task.google.remote_path.clone(),
+            google_remote_id: task.google.remote_id.clone(),
+            google_url: task.google.share.url.clone(),
+            google_code: task.google.share.code.clone(),
+            google_expires_at: task.google.share.expires_at,
+            google_share_id: task.google.share.share_id.clone(),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
     pub baidu_default_dir: String,
+    pub google_default_dir: String,
     pub dated_subdirectory: bool,
     pub max_concurrent_files: u32,
     pub retry_limit: u32,
@@ -143,12 +164,17 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             baidu_default_dir: "/apps/双盘发货助手/自动发货/".to_string(),
+            google_default_dir: "/自动发货/".to_string(),
             dated_subdirectory: false,
             max_concurrent_files: 2,
             retry_limit: 3,
             share_period_days: 0,
-            copy_template: "文件：{filename}\n百度网盘：\n{baidu_url}\n{baidu_code_line}"
-                .to_string(),
+            copy_template: concat!(
+                "文件：{filename}\n",
+                "百度网盘：\n{baidu_url}\n{baidu_code_line}\n",
+                "Google Drive：\n{google_url}\n{google_code_line}"
+            )
+            .to_string(),
             auto_copy: false,
         }
     }
@@ -211,6 +237,13 @@ pub struct AppSnapshot {
 pub struct ProviderCredentialsInput {
     pub app_key: String,
     pub secret_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleCredentialsInput {
+    pub client_id: String,
+    pub client_secret: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
