@@ -49,11 +49,17 @@ impl Database {
                baidu_expires_at INTEGER,
                baidu_share_id TEXT,
                google_path TEXT,
+               onedrive_path TEXT,
                google_remote_id TEXT,
+               onedrive_remote_id TEXT,
                google_url TEXT,
+               onedrive_url TEXT,
                google_code TEXT,
+               onedrive_code TEXT,
                google_expires_at INTEGER,
+               onedrive_expires_at INTEGER,
                google_share_id TEXT,
+               onedrive_share_id TEXT,
                quark_path TEXT,
                quark_remote_id TEXT,
                quark_url TEXT,
@@ -67,11 +73,17 @@ impl Database {
         )?;
         ensure_history_column(&connection, "baidu_remote_id", "TEXT")?;
         ensure_history_column(&connection, "google_path", "TEXT")?;
+        ensure_history_column(&connection, "onedrive_path", "TEXT")?;
         ensure_history_column(&connection, "google_remote_id", "TEXT")?;
+        ensure_history_column(&connection, "onedrive_remote_id", "TEXT")?;
         ensure_history_column(&connection, "google_url", "TEXT")?;
+        ensure_history_column(&connection, "onedrive_url", "TEXT")?;
         ensure_history_column(&connection, "google_code", "TEXT")?;
+        ensure_history_column(&connection, "onedrive_code", "TEXT")?;
         ensure_history_column(&connection, "google_expires_at", "INTEGER")?;
+        ensure_history_column(&connection, "onedrive_expires_at", "INTEGER")?;
         ensure_history_column(&connection, "google_share_id", "TEXT")?;
+        ensure_history_column(&connection, "onedrive_share_id", "TEXT")?;
         // 旧版本的夸克列保留在表结构中，避免破坏性迁移；当前版本不再读取或写入这些列。
         Ok(Self {
             connection: Mutex::new(connection),
@@ -125,27 +137,29 @@ impl Database {
         let mut tasks = self.list_tasks(500)?;
         let mut recovered = Vec::new();
         for task in &mut tasks {
-            if matches!(task.state, TaskState::Waiting | TaskState::Processing) {
-                task.state = TaskState::Paused;
-                task.message = Some("程序上次退出时任务未完成，可点击继续".to_string());
+            let mut changed = false;
+            for platform in [&mut task.baidu, &mut task.google, &mut task.onedrive] {
                 if matches!(
-                    task.baidu.state,
+                    platform.state,
                     PlatformState::Waiting
                         | PlatformState::Hashing
                         | PlatformState::Uploading
                         | PlatformState::CreatingShare
                 ) {
-                    task.baidu.state = PlatformState::Paused;
+                    platform.state = PlatformState::Paused;
+                    changed = true;
                 }
-                if matches!(
-                    task.google.state,
-                    PlatformState::Waiting
-                        | PlatformState::Hashing
-                        | PlatformState::Uploading
-                        | PlatformState::CreatingShare
-                ) {
-                    task.google.state = PlatformState::Paused;
-                }
+            }
+            if changed {
+                task.state = if [&task.baidu, &task.google, &task.onedrive]
+                    .iter()
+                    .any(|p| p.state == PlatformState::Completed)
+                {
+                    TaskState::PartialSuccess
+                } else {
+                    TaskState::Paused
+                };
+                task.message = Some("程序上次退出时任务未完成，可按平台继续".into());
                 self.save_task(task)?;
                 recovered.push(task.clone());
             }
@@ -159,8 +173,9 @@ impl Database {
             "INSERT INTO history (
                id,file_name,file_size,local_path,file_hash,uploaded_at,task_status,
                baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id,
-               google_path,google_remote_id,google_url,google_code,google_expires_at,google_share_id
-             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+               google_path,google_remote_id,google_url,google_code,google_expires_at,google_share_id,
+                    onedrive_path,onedrive_remote_id,onedrive_url,onedrive_code,onedrive_expires_at,onedrive_share_id
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)
              ON CONFLICT(id) DO UPDATE SET
                uploaded_at=excluded.uploaded_at, task_status=excluded.task_status,
                baidu_path=excluded.baidu_path, baidu_remote_id=excluded.baidu_remote_id,
@@ -170,7 +185,13 @@ impl Database {
                google_path=excluded.google_path, google_remote_id=excluded.google_remote_id,
                google_url=excluded.google_url, google_code=excluded.google_code,
                google_expires_at=excluded.google_expires_at,
-               google_share_id=excluded.google_share_id",
+               google_share_id=excluded.google_share_id,
+               onedrive_path=excluded.onedrive_path,
+               onedrive_remote_id=excluded.onedrive_remote_id,
+               onedrive_url=excluded.onedrive_url,
+               onedrive_code=excluded.onedrive_code,
+               onedrive_expires_at=excluded.onedrive_expires_at,
+               onedrive_share_id=excluded.onedrive_share_id",
             params![
                 record.id,
                 record.file_name,
@@ -190,7 +211,13 @@ impl Database {
                 record.google_url,
                 record.google_code,
                 record.google_expires_at,
-                record.google_share_id
+                record.google_share_id,
+                record.onedrive_path,
+                record.onedrive_remote_id,
+                record.onedrive_url,
+                record.onedrive_code,
+                record.onedrive_expires_at,
+                record.onedrive_share_id
             ],
         )?;
         Ok(())
@@ -202,7 +229,8 @@ impl Database {
         let mut statement = connection.prepare(
             "SELECT id,file_name,file_size,local_path,file_hash,uploaded_at,task_status,
                     baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id,
-                    google_path,google_remote_id,google_url,google_code,google_expires_at,google_share_id
+                    google_path,google_remote_id,google_url,google_code,google_expires_at,google_share_id,
+                    onedrive_path,onedrive_remote_id,onedrive_url,onedrive_code,onedrive_expires_at,onedrive_share_id
              FROM history WHERE file_name LIKE ?1 ORDER BY uploaded_at DESC LIMIT ?2",
         )?;
         let rows = statement.query_map(params![pattern, limit as i64], history_from_row)?;
@@ -215,9 +243,10 @@ impl Database {
             .query_row(
                 "SELECT id,file_name,file_size,local_path,file_hash,uploaded_at,task_status,
                         baidu_path,baidu_remote_id,baidu_url,baidu_code,baidu_expires_at,baidu_share_id,
-                        google_path,google_remote_id,google_url,google_code,google_expires_at,google_share_id
+                        google_path,google_remote_id,google_url,google_code,google_expires_at,google_share_id,
+                    onedrive_path,onedrive_remote_id,onedrive_url,onedrive_code,onedrive_expires_at,onedrive_share_id
                  FROM history WHERE file_hash=?1 AND file_size=?2
-                 ORDER BY ((baidu_path IS NOT NULL) + (google_path IS NOT NULL)) DESC,
+                 ORDER BY ((baidu_path IS NOT NULL) + (google_path IS NOT NULL) + (onedrive_path IS NOT NULL)) DESC,
                           uploaded_at DESC LIMIT 1",
                 params![hash, size as i64],
                 history_from_row,
@@ -280,20 +309,27 @@ impl Database {
 
 fn migrate_settings(settings: &mut AppSettings) {
     const BAIDU_ONLY_DEFAULT: &str = "文件：{filename}\n百度网盘：\n{baidu_url}\n{baidu_code_line}";
-    if settings.copy_template == BAIDU_ONLY_DEFAULT {
-        settings
-            .copy_template
-            .push_str("\nGoogle Drive：\n{google_url}\n{google_code_line}");
+    const TWO_DRIVE_DEFAULT: &str = "文件：{filename}\n百度网盘：\n{baidu_url}\n{baidu_code_line}\nGoogle Drive：\n{google_url}\n{google_code_line}";
+    if settings.copy_template == TWO_DRIVE_DEFAULT || settings.copy_template == BAIDU_ONLY_DEFAULT {
+        settings.copy_template = AppSettings::default().copy_template;
     }
 }
 
 fn parse_task(payload: String) -> AppResult<UploadTask> {
     let value: serde_json::Value =
         serde_json::from_str(&payload).map_err(|error| AppError::Database(error.to_string()))?;
+    let had_onedrive = value.get("onedrive").is_some();
     let had_google = value.get("google").is_some();
     let mut task: UploadTask =
         serde_json::from_value(value).map_err(|error| AppError::Database(error.to_string()))?;
     normalize_legacy_task(&mut task, had_google);
+    if !had_onedrive {
+        task.onedrive = crate::models::PlatformTask::waiting(task.file_size);
+        task.onedrive.state = PlatformState::Paused;
+        if matches!(task.state, TaskState::Completed | TaskState::Duplicate) {
+            task.state = TaskState::PartialSuccess;
+        }
+    }
     Ok(task)
 }
 
@@ -405,6 +441,12 @@ fn history_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryRecord> 
         google_code: row.get(16)?,
         google_expires_at: row.get(17)?,
         google_share_id: row.get(18)?,
+        onedrive_path: row.get(19)?,
+        onedrive_remote_id: row.get(20)?,
+        onedrive_url: row.get(21)?,
+        onedrive_code: row.get(22)?,
+        onedrive_expires_at: row.get(23)?,
+        onedrive_share_id: row.get(24)?,
     })
 }
 
@@ -429,7 +471,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("app.db");
         let database = Database::open(&path).unwrap();
-        let task = UploadTask {
+        let mut task = UploadTask {
             id: "task-1".into(),
             batch_id: "batch-1".into(),
             local_path: "C:/file.zip".into(),
@@ -442,14 +484,36 @@ mod tests {
             message: None,
             baidu: PlatformTask::waiting(42),
             google: PlatformTask::waiting(42),
+            onedrive: PlatformTask::waiting(42),
         };
+        task.onedrive.remote_id = Some("ms-item".into());
+        task.onedrive.share.url = Some("https://example.test/onedrive".into());
         database.save_task(&task).unwrap();
         database.save_history(&task).unwrap();
         drop(database);
 
         let reopened = Database::open(&path).unwrap();
         assert_eq!(reopened.get_task("task-1").unwrap().unwrap().file_size, 42);
-        assert_eq!(reopened.search_history("file", 10).unwrap().len(), 1);
+        let history = reopened.search_history("file", 10).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].onedrive_remote_id.as_deref(), Some("ms-item"));
+        assert_eq!(
+            history[0].onedrive_url.as_deref(),
+            Some("https://example.test/onedrive")
+        );
+        let mut payload = serde_json::to_value(&task).unwrap();
+        payload.as_object_mut().unwrap().remove("onedrive");
+        let legacy = super::parse_task(payload.to_string()).unwrap();
+        assert_eq!(legacy.onedrive.state, PlatformState::Paused);
+        assert_eq!(legacy.onedrive.total_bytes, 42);
+        assert_eq!(legacy.state, TaskState::PartialSuccess);
+        task.baidu.state = PlatformState::Completed;
+        task.state = TaskState::PartialSuccess;
+        task.onedrive.state = PlatformState::Uploading;
+        reopened.save_task(&task).unwrap();
+        let recovered = reopened.recover_incomplete_tasks().unwrap();
+        assert_eq!(recovered[0].onedrive.state, PlatformState::Paused);
+        assert_eq!(recovered[0].baidu.state, PlatformState::Completed);
     }
 
     #[test]
@@ -493,6 +557,8 @@ mod tests {
         assert!(columns.contains(&"baidu_remote_id".to_string()));
         assert!(columns.contains(&"google_remote_id".to_string()));
         assert!(columns.contains(&"google_url".to_string()));
+        assert!(columns.contains(&"onedrive_remote_id".to_string()));
+        assert!(columns.contains(&"onedrive_url".to_string()));
     }
 
     #[test]
@@ -510,6 +576,7 @@ mod tests {
             message: None,
             baidu: PlatformTask::waiting(7),
             google: PlatformTask::waiting(7),
+            onedrive: PlatformTask::waiting(7),
         };
         task.baidu.state = PlatformState::Completed;
         let mut payload = serde_json::to_value(&task).unwrap();
@@ -541,6 +608,7 @@ mod tests {
             message: None,
             baidu: PlatformTask::waiting(7),
             google: PlatformTask::waiting(7),
+            onedrive: PlatformTask::waiting(7),
         };
 
         let mut payload = serde_json::to_value(&task).unwrap();
@@ -573,12 +641,14 @@ mod tests {
             message: None,
             baidu,
             google,
+            onedrive: PlatformTask::waiting(7),
         };
         let without_baidu = UploadTask {
             id: "without-baidu".into(),
             updated_at: 2,
             baidu: PlatformTask::waiting(7),
             google: PlatformTask::waiting(7),
+            onedrive: PlatformTask::waiting(7),
             ..with_baidu.clone()
         };
         database.save_history(&with_baidu).unwrap();

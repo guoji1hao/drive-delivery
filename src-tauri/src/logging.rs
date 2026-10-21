@@ -66,6 +66,9 @@ fn redact(input: &str) -> String {
         || lower.contains("upload_id")
         || lower.contains("uploadid")
         || lower.contains("session_uri")
+        || lower.contains("session_url")
+        || lower.contains("uploadurl")
+        || lower.contains("device_code")
     {
         "敏感认证信息已隐藏".to_string()
     } else {

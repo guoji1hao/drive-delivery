@@ -15,7 +15,7 @@ description: Maintain, debug, test, or package the 双盘发货助手 Tauri 2 + 
 
 Vue 组件位于 `src/components`，只负责交互和展示；所有系统能力通过 `src/services/api.ts` 调用 Tauri 命令。
 
-Rust 的统一平台接口位于 `src-tauri/src/adapters/mod.rs`，当前实现 `BaiduDriveAdapter` 与 `GoogleDriveAdapter`。平台协议细节只能留在各自 Adapter，不要泄露到 `task_manager.rs` 或 Vue 组件。
+Rust 的统一平台接口位于 `src-tauri/src/adapters/mod.rs`，当前实现 `BaiduDriveAdapter`、`GoogleDriveAdapter` 与 `OneDriveAdapter`。平台协议细节只能留在各自 Adapter，不要泄露到 `task_manager.rs` 或 Vue 组件。
 
 任务状态与独立重试在 `task_manager.rs`，SQLite 与迁移在 `database.rs`，百度认证在 `auth.rs`，Google loopback OAuth 在 `auth/google.rs`，系统安全存储在 `secret_store.rs`，分享文案在 `share_manager.rs`，日志脱敏在 `logging.rs`。
 
@@ -42,3 +42,15 @@ Google 分享使用 `permissions.create` 的 `anyone/reader` 和 `files.webViewL
 E 盘空间有限时不要同时保留 debug 和 release 两套大型 Cargo 缓存。只清理可重建的 `src-tauri/target`，使用 `cargo test --release` 后复用同一 release 依赖构建 NSIS。
 
 完整验收命令见 `references/verification.md`。打包前生成或检查 Tauri 图标，NSIS 产物位于 `src-tauri/target/release/bundle/nsis`。
+
+## OneDrive 接入经验（2026-10-21）
+
+微软授权独立放在 `auth/onedrive.rs`，使用全球云 common 租户设备码。Client ID 必须是 UUID；只请求 Files.ReadWrite 和 offline_access。设备码保留在后端，以随机句柄暴露给前端，服务端保存轮询间隔并处理 slow_down；刷新令牌串行化，清除授权也清除挂起请求。企业条件访问可能拒绝设备码流，不能声称所有组织账号可用。
+
+OneDrive 分片固定 5 MiB，为 320 KiB 整数倍。uploadUrl 是预授权 URL，不携带 Graph Bearer，不允许重定向，只允许微软 HTTPS 上传域名。错误不输出 URL；GET 查询失败保留会话，仅 404/410 且结果不存在才重新创建。续传记录绑定 drive ID，账号变化时拒绝继续。文件名追加稳定任务 ID，完成响应丢失时通过同路径与大小找回；不能改回覆盖模式。
+
+新增平台须同步 Rust/TS 模型、建表/旧表列迁移、任务 JSON 默认值与暂停迁移、去重/状态聚合、设置默认模板迁移、命令注册、历史查询及复制入口。旧自定义模板不覆盖。分享失败重试应根据远端结果决定只分享，不能依赖被 retry 重置的状态。异常退出恢复应检查每个平台，不能只检查总状态，因为总状态可能已是 partial_success。
+
+页面检查使用 `scripts/ui-smoke.js`，通过 Playwright CLI `run-code --filename scripts/ui-smoke.js` 执行；需先启动 127.0.0.1:1420。它只 Mock Tauri IPC，不访问网盘。输出图片在 output/playwright，测试目录忽略 Git。没有真实凭据时如实报告本地验收边界。
+
+AOCI 已初始化项目级配置和索引骨架；未加载本项目 MCP 的会话不得 scan 或声称索引 aligned，应在重新打开项目后按实时 Guide 建立索引。

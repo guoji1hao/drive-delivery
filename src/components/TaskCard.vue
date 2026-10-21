@@ -49,6 +49,14 @@ const emit = defineEmits<{
         @retry="emit('retry', task.id, 'google')"
         @cancel="emit('cancel', task.id, 'google')"
       />
+      <PlatformProgress
+        name="OneDrive"
+        provider="onedrive"
+        :value="task.onedrive"
+        @pause="emit('pause', task.id, 'onedrive')"
+        @retry="emit('retry', task.id, 'onedrive')"
+        @cancel="emit('cancel', task.id, 'onedrive')"
+      />
     </div>
 
     <ResultCard

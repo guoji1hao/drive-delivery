@@ -1,5 +1,5 @@
 use crate::{
-    adapters::{baidu::BaiduDriveAdapter, google::GoogleDriveAdapter},
+    adapters::{baidu::BaiduDriveAdapter, google::GoogleDriveAdapter, onedrive::OneDriveAdapter},
     auth::AuthManager,
     database::Database,
     errors::AppResult,
@@ -40,12 +40,14 @@ impl AppState {
         let auth = Arc::new(AuthManager::new(database.clone(), log.clone())?);
         let baidu = Arc::new(BaiduDriveAdapter::new(auth.clone(), log.clone())?);
         let google = Arc::new(GoogleDriveAdapter::new(auth.clone(), log.clone())?);
+        let onedrive = Arc::new(OneDriveAdapter::new(auth.clone())?);
         let tasks = Arc::new(TaskManager::new(
             app,
             database.clone(),
             settings.clone(),
             baidu,
             google,
+            onedrive,
             log.clone(),
         ));
         log.info("app", "双盘发货助手启动完成");

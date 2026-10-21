@@ -49,7 +49,7 @@ impl From<reqwest::Error> for AppError {
         if value.is_timeout() {
             Self::Provider("网络请求超时，可稍后重试".to_string())
         } else {
-            Self::Provider(value.to_string())
+            Self::Provider(value.without_url().to_string())
         }
     }
 }

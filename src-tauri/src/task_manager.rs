@@ -1,7 +1,7 @@
 use crate::{
     adapters::{
         DriveAdapter, ProgressSink, UploadOutcome, UploadProgress, UploadRequest,
-        baidu::BaiduDriveAdapter, google::GoogleDriveAdapter,
+        baidu::BaiduDriveAdapter, google::GoogleDriveAdapter, onedrive::OneDriveAdapter,
     },
     clipboard,
     database::Database,
@@ -37,6 +37,7 @@ use walkdir::WalkDir;
 pub enum Provider {
     Baidu,
     Google,
+    OneDrive,
 }
 
 impl Provider {
@@ -44,6 +45,7 @@ impl Provider {
         match value {
             "baidu" => Ok(Self::Baidu),
             "google" => Ok(Self::Google),
+            "onedrive" => Ok(Self::OneDrive),
             _ => Err(AppError::Configuration(format!("不支持的平台：{value}"))),
         }
     }
@@ -52,6 +54,7 @@ impl Provider {
         match self {
             Self::Baidu => "baidu",
             Self::Google => "google",
+            Self::OneDrive => "onedrive",
         }
     }
 }
@@ -62,6 +65,7 @@ pub struct TaskManager {
     settings: Arc<SettingsService>,
     baidu: Arc<BaiduDriveAdapter>,
     google: Arc<GoogleDriveAdapter>,
+    onedrive: Arc<OneDriveAdapter>,
     log: Arc<LogService>,
     cancellation: AsyncMutex<HashMap<String, CancellationToken>>,
 }
@@ -73,6 +77,7 @@ impl TaskManager {
         settings: Arc<SettingsService>,
         baidu: Arc<BaiduDriveAdapter>,
         google: Arc<GoogleDriveAdapter>,
+        onedrive: Arc<OneDriveAdapter>,
         log: Arc<LogService>,
     ) -> Self {
         Self {
@@ -81,6 +86,7 @@ impl TaskManager {
             settings,
             baidu,
             google,
+            onedrive,
             log,
             cancellation: AsyncMutex::new(HashMap::new()),
         }
@@ -132,6 +138,7 @@ impl TaskManager {
                     message: None,
                     baidu: PlatformTask::waiting(size),
                     google: PlatformTask::waiting(size),
+                    onedrive: PlatformTask::waiting(size),
                 }
             };
             let should_start = task.state != TaskState::Duplicate;
@@ -259,6 +266,11 @@ impl TaskManager {
                         Arc::clone(&shared),
                         &settings,
                         Provider::Google
+                    ),
+                    self.process_provider_with_retries(
+                        Arc::clone(&shared),
+                        &settings,
+                        Provider::OneDrive
                     )
                 );
             }
@@ -269,8 +281,8 @@ impl TaskManager {
             task.state = overall_state(&task);
             task.updated_at = Utc::now().timestamp();
             task.message = Some(match task.state {
-                TaskState::Completed => "百度网盘与 Google Drive 均处理完成".to_string(),
-                TaskState::PartialSuccess => "一个平台已完成，另一个平台可单独重试".to_string(),
+                TaskState::Completed => "所有平台均处理完成".to_string(),
+                TaskState::PartialSuccess => "部分平台已完成，其余平台可单独重试".to_string(),
                 _ => "平台处理未全部完成，可按平台重试".to_string(),
             });
         }
@@ -352,6 +364,7 @@ impl TaskManager {
         let adapter: Arc<dyn DriveAdapter> = match provider {
             Provider::Baidu => self.baidu.clone(),
             Provider::Google => self.google.clone(),
+            Provider::OneDrive => self.onedrive.clone(),
         };
         let cancel = CancellationToken::new();
         let cancel_key = cancellation_key(&task_id, provider);
@@ -369,14 +382,11 @@ impl TaskManager {
                 resume_data: existing.resume_data.clone(),
                 instant_upload: true,
             });
-        let should_share_only = outcome_from_history.is_some()
-            && matches!(
-                previous_state,
-                PlatformState::CreatingShare | PlatformState::Retryable
-            );
+        let should_share_only = existing.remote_id.is_some() && outcome_from_history.is_some();
         let base_dir = match provider {
             Provider::Baidu => &settings.baidu_default_dir,
             Provider::Google => &settings.google_default_dir,
+            Provider::OneDrive => &settings.onedrive_default_dir,
         };
         let remote_dir = dated_dir(base_dir, settings.dated_subdirectory);
         let progress_task = Arc::clone(&task);
@@ -523,6 +533,7 @@ fn platform(task: &UploadTask, provider: Provider) -> &PlatformTask {
     match provider {
         Provider::Baidu => &task.baidu,
         Provider::Google => &task.google,
+        Provider::OneDrive => &task.onedrive,
     }
 }
 
@@ -530,6 +541,7 @@ fn platform_mut(task: &mut UploadTask, provider: Provider) -> &mut PlatformTask 
     match provider {
         Provider::Baidu => &mut task.baidu,
         Provider::Google => &mut task.google,
+        Provider::OneDrive => &mut task.onedrive,
     }
 }
 
@@ -538,15 +550,15 @@ fn cancellation_key(task_id: &str, provider: Provider) -> String {
 }
 
 fn overall_state(task: &UploadTask) -> TaskState {
-    let states = [&task.baidu.state, &task.google.state];
+    let states = [&task.baidu.state, &task.google.state, &task.onedrive.state];
     let completed = states
         .iter()
         .filter(|state| **state == &PlatformState::Completed)
         .count();
-    if completed == 2 {
+    if completed == states.len() {
         return TaskState::Completed;
     }
-    if completed == 1 {
+    if completed > 0 {
         return TaskState::PartialSuccess;
     }
     if states.iter().any(|state| {
@@ -599,10 +611,21 @@ fn duplicate_task(
         history.google_expires_at,
         history.google_share_id,
     );
+    let mut onedrive = history_platform(
+        size,
+        history.onedrive_path,
+        history.onedrive_remote_id,
+        history.onedrive_url,
+        history.onedrive_code,
+        history.onedrive_expires_at,
+        history.onedrive_share_id,
+    );
     let baidu_needs_upload = baidu.remote_path.is_none();
     let google_needs_upload = google.remote_path.is_none();
+    let onedrive_needs_upload = onedrive.remote_path.is_none();
     let baidu_needs_share = baidu.remote_path.is_some() && !share_valid(&baidu.share, now);
     let google_needs_share = google.remote_path.is_some() && !share_valid(&google.share, now);
+    let onedrive_needs_share = onedrive.remote_path.is_some() && !share_valid(&onedrive.share, now);
     if baidu_needs_upload {
         baidu = PlatformTask::waiting(size);
     } else if baidu_needs_share {
@@ -613,8 +636,17 @@ fn duplicate_task(
     } else if google_needs_share {
         google.state = PlatformState::CreatingShare;
     }
-    let needs_processing =
-        baidu_needs_upload || google_needs_upload || baidu_needs_share || google_needs_share;
+    if onedrive_needs_upload {
+        onedrive = PlatformTask::waiting(size);
+    } else if onedrive_needs_share {
+        onedrive.state = PlatformState::CreatingShare;
+    }
+    let needs_processing = baidu_needs_upload
+        || google_needs_upload
+        || baidu_needs_share
+        || google_needs_share
+        || onedrive_needs_upload
+        || onedrive_needs_share;
     UploadTask {
         id: Uuid::new_v4().to_string(),
         batch_id: batch_id.to_string(),
@@ -629,15 +661,18 @@ fn duplicate_task(
         } else {
             TaskState::Duplicate
         },
-        message: Some(if baidu_needs_upload || google_needs_upload {
-            "已命中历史记录，仅上传缺失的平台".to_string()
-        } else if baidu_needs_share || google_needs_share {
-            "已命中上传记录，仅重新创建失效的分享".to_string()
-        } else {
-            "该文件已经上传过，已直接显示历史分享结果".to_string()
-        }),
+        message: Some(
+            if baidu_needs_upload || google_needs_upload || onedrive_needs_upload {
+                "已命中历史记录，仅上传缺失的平台".to_string()
+            } else if baidu_needs_share || google_needs_share || onedrive_needs_share {
+                "已命中上传记录，仅重新创建失效的分享".to_string()
+            } else {
+                "该文件已经上传过，已直接显示历史分享结果".to_string()
+            },
+        ),
         baidu,
         google,
+        onedrive,
     }
 }
 
@@ -751,11 +786,17 @@ mod tests {
             baidu_expires_at: None,
             baidu_share_id: None,
             google_path: Some("My Drive/自动发货/file.zip".into()),
+            onedrive_path: Some("OneDrive/自动发货/file.zip".into()),
             google_remote_id: Some("google-file".into()),
+            onedrive_remote_id: Some("onedrive-file".into()),
             google_url: Some("https://drive.google.com/file/d/demo/view".into()),
+            onedrive_url: Some("https://example.test/onedrive-share".into()),
             google_code: None,
+            onedrive_code: None,
             google_expires_at: None,
+            onedrive_expires_at: None,
             google_share_id: Some("anyoneWithLink".into()),
+            onedrive_share_id: Some("anyoneWithLink".into()),
         }
     }
 
@@ -806,6 +847,39 @@ mod tests {
     }
 
     #[test]
+    fn onedrive_missing_or_expired_preserves_other_platforms() {
+        let mut record = history();
+        record.onedrive_expires_at = Some(90);
+        let task = duplicate_task(
+            "batch",
+            Path::new("file.zip"),
+            "file.zip".into(),
+            10,
+            "hash".into(),
+            100,
+            record.clone(),
+        );
+        assert_eq!(task.onedrive.state, PlatformState::CreatingShare);
+        assert_eq!(task.google.state, PlatformState::Completed);
+        assert_eq!(task.baidu.state, PlatformState::Completed);
+        record.onedrive_path = None;
+        record.onedrive_remote_id = None;
+        record.onedrive_url = None;
+        let task = duplicate_task(
+            "batch",
+            Path::new("file.zip"),
+            "file.zip".into(),
+            10,
+            "hash".into(),
+            100,
+            record,
+        );
+        assert_eq!(task.onedrive.state, PlatformState::Waiting);
+        assert_eq!(task.google.state, PlatformState::Completed);
+        assert_eq!(Provider::parse("onedrive").unwrap(), Provider::OneDrive);
+    }
+
+    #[test]
     fn one_success_is_partial_success() {
         let task = crate::models::UploadTask {
             id: "1".into(),
@@ -822,6 +896,7 @@ mod tests {
                 state: PlatformState::Completed,
                 ..PlatformTask::waiting(1)
             },
+            onedrive: PlatformTask::waiting(1),
             google: PlatformTask {
                 state: PlatformState::Retryable,
                 ..PlatformTask::waiting(1)

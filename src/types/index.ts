@@ -20,7 +20,7 @@ export type TaskState =
   | "failed"
   | "duplicate";
 
-export type Provider = "baidu" | "google";
+export type Provider = "baidu" | "google" | "onedrive";
 
 export interface ShareResult {
   url?: string;
@@ -58,6 +58,7 @@ export interface UploadTask {
   message?: string;
   baidu: PlatformTask;
   google: PlatformTask;
+  onedrive: PlatformTask;
 }
 
 export interface HistoryRecord {
@@ -75,16 +76,23 @@ export interface HistoryRecord {
   baiduExpiresAt?: number;
   baiduShareId?: string;
   googlePath?: string;
+  onedrivePath?: string;
   googleRemoteId?: string;
+  onedriveRemoteId?: string;
   googleUrl?: string;
+  onedriveUrl?: string;
   googleCode?: string;
+  onedriveCode?: string;
   googleExpiresAt?: number;
+  onedriveExpiresAt?: number;
   googleShareId?: string;
+  onedriveShareId?: string;
 }
 
 export interface AppSettings {
   baiduDefaultDir: string;
   googleDefaultDir: string;
+  onedriveDefaultDir: string;
   datedSubdirectory: boolean;
   maxConcurrentFiles: number;
   retryLimit: number;

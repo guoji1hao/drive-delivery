@@ -95,6 +95,8 @@ pub struct UploadTask {
     pub baidu: PlatformTask,
     #[serde(default)]
     pub google: PlatformTask,
+    #[serde(default)]
+    pub onedrive: PlatformTask,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,11 +116,17 @@ pub struct HistoryRecord {
     pub baidu_expires_at: Option<i64>,
     pub baidu_share_id: Option<String>,
     pub google_path: Option<String>,
+    pub onedrive_path: Option<String>,
     pub google_remote_id: Option<String>,
+    pub onedrive_remote_id: Option<String>,
     pub google_url: Option<String>,
+    pub onedrive_url: Option<String>,
     pub google_code: Option<String>,
+    pub onedrive_code: Option<String>,
     pub google_expires_at: Option<i64>,
+    pub onedrive_expires_at: Option<i64>,
     pub google_share_id: Option<String>,
+    pub onedrive_share_id: Option<String>,
 }
 
 impl From<&UploadTask> for HistoryRecord {
@@ -138,11 +146,17 @@ impl From<&UploadTask> for HistoryRecord {
             baidu_expires_at: task.baidu.share.expires_at,
             baidu_share_id: task.baidu.share.share_id.clone(),
             google_path: task.google.remote_path.clone(),
+            onedrive_path: task.onedrive.remote_path.clone(),
             google_remote_id: task.google.remote_id.clone(),
+            onedrive_remote_id: task.onedrive.remote_id.clone(),
             google_url: task.google.share.url.clone(),
+            onedrive_url: task.onedrive.share.url.clone(),
             google_code: task.google.share.code.clone(),
+            onedrive_code: task.onedrive.share.code.clone(),
             google_expires_at: task.google.share.expires_at,
+            onedrive_expires_at: task.onedrive.share.expires_at,
             google_share_id: task.google.share.share_id.clone(),
+            onedrive_share_id: task.onedrive.share.share_id.clone(),
         }
     }
 }
@@ -152,6 +166,7 @@ impl From<&UploadTask> for HistoryRecord {
 pub struct AppSettings {
     pub baidu_default_dir: String,
     pub google_default_dir: String,
+    pub onedrive_default_dir: String,
     pub dated_subdirectory: bool,
     pub max_concurrent_files: u32,
     pub retry_limit: u32,
@@ -165,6 +180,7 @@ impl Default for AppSettings {
         Self {
             baidu_default_dir: "/apps/双盘发货助手/自动发货/".to_string(),
             google_default_dir: "/自动发货/".to_string(),
+            onedrive_default_dir: "/自动发货/".to_string(),
             dated_subdirectory: false,
             max_concurrent_files: 2,
             retry_limit: 3,
@@ -172,7 +188,8 @@ impl Default for AppSettings {
             copy_template: concat!(
                 "文件：{filename}\n",
                 "百度网盘：\n{baidu_url}\n{baidu_code_line}\n",
-                "Google Drive：\n{google_url}\n{google_code_line}"
+                "Google Drive：\n{google_url}\n{google_code_line}\n",
+                "OneDrive：\n{onedrive_url}\n{onedrive_code_line}"
             )
             .to_string(),
             auto_copy: false,

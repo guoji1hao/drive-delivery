@@ -33,6 +33,11 @@ export const api = {
   pollGoogleAuth: (deviceCode: string) =>
     invoke<AuthPollResult>("poll_google_auth", { deviceCode }),
   clearGoogleAuth: () => invoke<AuthStatus>("clear_google_auth"),
+  saveOneDriveCredentials: (clientId: string) => invoke<AuthStatus>("save_onedrive_credentials", { clientId }),
+  startOneDriveAuth: () => invoke<AuthChallenge>("start_onedrive_auth"),
+  pollOneDriveAuth: (deviceCode: string) =>
+    invoke<AuthPollResult>("poll_onedrive_auth", { deviceCode }),
+  clearOneDriveAuth: () => invoke<AuthStatus>("clear_onedrive_auth"),
   pauseTask: (taskId: string, provider: Provider) =>
     invoke<UploadTask>("pause_task", { taskId, provider }),
   cancelTask: (taskId: string, provider: Provider) =>

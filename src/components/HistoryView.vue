@@ -65,6 +65,7 @@ onMounted(search);
             <th>上传时间</th>
             <th>百度</th>
             <th>Google</th>
+            <th>OneDrive</th>
             <th>状态</th>
             <th />
           </tr>
@@ -84,14 +85,19 @@ onMounted(search);
               <a v-if="record.googleUrl" :href="record.googleUrl" target="_blank">已生成</a>
               <span v-else>无链接</span>
             </td>
+            <td>
+              <a v-if="record.onedriveUrl" :href="record.onedriveUrl" target="_blank">已生成</a>
+              <span v-else>无链接</span>
+            </td>
             <td>{{ taskStateText[record.taskStatus] }}</td>
             <td>
               <div class="history-actions">
                 <button class="copy-link" :disabled="!record.baiduUrl" @click="copy(record, 'baidu')">百度</button>
                 <button class="copy-link" :disabled="!record.googleUrl" @click="copy(record, 'google')">Google</button>
+                <button class="copy-link" :disabled="!record.onedriveUrl" @click="copy(record, 'onedrive')">OneDrive</button>
                 <button
                   class="small-button"
-                  :disabled="!record.baiduUrl && !record.googleUrl"
+                  :disabled="!record.baiduUrl && !record.googleUrl && !record.onedriveUrl"
                   @click="copy(record, 'all')"
                 >
                   复制全部

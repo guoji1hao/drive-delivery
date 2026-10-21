@@ -6,6 +6,7 @@ use crate::{
     secret_store::SecretStore,
 };
 mod google;
+mod onedrive;
 
 use chrono::Utc;
 use reqwest::Client;
@@ -27,6 +28,8 @@ pub struct AuthManager {
     client: Client,
     log: Arc<LogService>,
     google_pending: AsyncMutex<HashMap<String, GooglePendingAuth>>,
+    onedrive_pending: AsyncMutex<HashMap<String, onedrive::OneDrivePending>>,
+    onedrive_refresh: AsyncMutex<()>,
 }
 
 pub(super) struct GooglePendingAuth {
@@ -72,6 +75,8 @@ impl AuthManager {
             client,
             log,
             google_pending: AsyncMutex::new(HashMap::new()),
+            onedrive_pending: AsyncMutex::new(HashMap::new()),
+            onedrive_refresh: AsyncMutex::new(()),
         })
     }
 

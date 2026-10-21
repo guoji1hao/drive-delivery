@@ -84,7 +84,7 @@ async function control(
         ? "该平台任务已暂停"
         : action === "cancel"
           ? "该平台任务已取消"
-          : `已重新执行${provider === "baidu" ? "百度" : "Google"}任务`,
+          : `已重新执行${provider === "baidu" ? "百度" : provider === "google" ? "Google" : "OneDrive"}任务`,
     );
   } catch (error) {
     showToast(String(error));
@@ -94,7 +94,7 @@ async function control(
 async function copy(taskId: string, provider: Provider | "all") {
   try {
     await api.copyTaskResult(taskId, provider);
-    showToast(provider === "all" ? "双盘分享信息已复制" : "平台分享信息已复制");
+    showToast(provider === "all" ? "全部分享信息已复制" : "平台分享信息已复制");
   } catch (error) {
     showToast(String(error));
   }
@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
         <span class="brand-mark"><i /><i /></span>
         <span>
           <strong>双盘发货助手</strong>
-          <small>BAIDU + GOOGLE DELIVERY</small>
+          <small>BAIDU + GOOGLE + ONEDRIVE</small>
         </span>
       </button>
       <nav>
@@ -194,8 +194,8 @@ onBeforeUnmount(() => {
       <div v-show="activeTab === 'tasks'" class="tasks-page">
         <section class="hero-copy">
           <span class="eyebrow">一次拖入 · 自动上传</span>
-          <h1>一次拖入，同时送达两个网盘。</h1>
-          <p>百度网盘与 Google Drive 并行上传，支持真实进度、断点续传、独立重试和历史去重。</p>
+          <h1>一次拖入，同时送达三个网盘。</h1>
+          <p>百度网盘、Google Drive 与 OneDrive 并行上传，支持真实进度、断点续传、独立重试和历史去重。</p>
         </section>
         <DropZone :active="dragActive" :busy="enqueueBusy" />
         <TaskList
@@ -208,7 +208,7 @@ onBeforeUnmount(() => {
         <section v-if="!tasks.length" class="first-run-note">
           <div>
             <strong>开始前请先完成平台授权</strong>
-            <p>百度和 Google 均使用官方 OAuth。未授权平台会保留为可重试状态，不会伪造上传或分享结果。</p>
+            <p>三个平台均使用官方 OAuth。未授权平台会保留为可重试状态，不会伪造上传或分享结果。</p>
           </div>
           <button class="small-button" @click="activeTab = 'settings'">前往设置</button>
         </section>

@@ -1,7 +1,7 @@
 [package]
 name = "dual-drive-assistant"
 version = "0.2.0"
-description = "百度网盘与 Google Drive 并行上传、历史去重和分享结果整理的 Windows 桌面工具"
+description = "百度网盘、Google Drive 与 OneDrive 并行上传、历史去重和分享结果整理的 Windows 桌面工具"
 authors = ["双盘发货助手"]
 edition = "2024"
 

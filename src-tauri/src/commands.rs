@@ -16,7 +16,11 @@ pub async fn initialize_app(state: State<'_, AppState>) -> AppResult<AppSnapshot
     Ok(AppSnapshot {
         tasks: state.tasks.list_tasks()?,
         settings: state.settings.get()?,
-        auth: vec![state.auth.baidu_status(), state.auth.google_status()],
+        auth: vec![
+            state.auth.baidu_status(),
+            state.auth.google_status(),
+            state.auth.onedrive_status(),
+        ],
         capabilities: capability_reports(),
         data_dir: state.data_dir.to_string_lossy().to_string(),
         log_dir: state.log.dir().to_string_lossy().to_string(),
@@ -82,6 +86,34 @@ pub async fn poll_google_auth(
 pub fn clear_google_auth(state: State<'_, AppState>) -> AppResult<AuthStatus> {
     state.auth.clear_google_auth()?;
     Ok(state.auth.google_status())
+}
+
+#[tauri::command]
+pub async fn save_onedrive_credentials(
+    state: State<'_, AppState>,
+    client_id: String,
+) -> AppResult<AuthStatus> {
+    state.auth.save_onedrive_credentials(&client_id).await?;
+    Ok(state.auth.onedrive_status())
+}
+
+#[tauri::command]
+pub async fn start_onedrive_auth(state: State<'_, AppState>) -> AppResult<AuthChallenge> {
+    state.auth.start_onedrive_auth().await
+}
+
+#[tauri::command]
+pub async fn poll_onedrive_auth(
+    state: State<'_, AppState>,
+    device_code: String,
+) -> AppResult<AuthPollResult> {
+    state.auth.poll_onedrive_auth(&device_code).await
+}
+
+#[tauri::command]
+pub async fn clear_onedrive_auth(state: State<'_, AppState>) -> AppResult<AuthStatus> {
+    state.auth.clear_onedrive_auth().await?;
+    Ok(state.auth.onedrive_status())
 }
 
 #[tauri::command]
@@ -162,6 +194,18 @@ pub fn copy_history_result(
 
 fn capability_reports() -> Vec<CapabilityReport> {
     vec![
+        CapabilityReport {
+            provider: "onedrive".into(),
+            oauth: "Microsoft 官方设备码授权与自动刷新".into(),
+            upload: "Microsoft Graph，5 MiB 流式分片".into(),
+            resume: "GET uploadUrl 查询 nextExpectedRanges".into(),
+            share: "createLink 创建只读公开链接".into(),
+            limitations: vec![
+                "需要注册公共客户端并授权 Files.ReadWrite / offline_access".into(),
+                "组织策略可能禁止匿名分享；有效期以服务端返回值为准".into(),
+                "文件名追加任务 ID，防止重试覆盖已有文件".into(),
+            ],
+        },
         CapabilityReport {
             provider: "baidu".to_string(),
             oauth: "官方 OAuth 2.0 设备码授权与 Refresh Token".to_string(),

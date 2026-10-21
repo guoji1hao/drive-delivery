@@ -1,6 +1,6 @@
 # 官方 API 调研记录
 
-核验日期：2026-08-30。
+Google 上传与新增 OneDrive 核验日期：2026-10-21；百度及 Google 其余协议记录沿用 2026-08-30。
 
 本记录只采信官方开放平台、官方文档与官方 SDK。未找到官方依据的能力标为“当前未确认官方 API 支持”，代码不会猜测 URL、参数或授权方式。
 
@@ -65,3 +65,24 @@ OAuth Desktop app 无法把 Client Secret 当作真正机密，因此官方协�
 ## 后续接入原则
 
 接入或升级平台前必须重新核验官方文档。只有官方资料明确给出端点、字段、授权约束和桌面应用使用条件后才能增加实现。平台能力必须进入独立 `BaiduDriveAdapter` 或 `GoogleDriveAdapter`，不得把私有调用散落在任务管理器或 Vue 页面中。
+
+## Microsoft OneDrive（2026-10-21）
+
+依据：[设备码 OAuth](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code)、[上传会话](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0)、[创建目录](https://learn.microsoft.com/en-us/graph/api/driveitem-post-children?view=graph-rest-1.0)、[创建分享链接](https://learn.microsoft.com/en-us/graph/api/driveitem-createlink?view=graph-rest-1.0)。本次采用现有 Rust reqwest 和统一 Adapter 接口，不增加 SDK 依赖。
+
+| 能力 | 官方契约与实现 |
+| --- | --- |
+| OAuth | public client，common 租户设备码；个人和工作/学校账号；设备码只留在后端内存，前端持有随机句柄 |
+| Refresh | offline_access；安全存储 Refresh Token，串行刷新及轮换 |
+| Scope | Graph Files.ReadWrite 委托权限；此权限允许读写当前用户文件，比 Google drive.file 范围更广 |
+| 上传 | createUploadSession，5 MiB 分片为 320 KiB 整数倍；空文件 content PUT；同名冲突 fail |
+| 断点 | GET uploadUrl，解析 nextExpectedRanges；仅明确 404/410 且结果不存在时新建，网络错误保留原会话 |
+| 完成恢复 | 文件名追加固定任务 ID；会话绑定 drive ID，完成响应丢失时读取对应项确认大小，避免重传 |
+| URL | 预授权上传 URL 不发送 Graph Authorization，禁止重定向，HTTPS 微软上传域名白名单；不记日志 |
+| 目录 | 按路径查询并创建 folder，409 后重新查询，拒绝同名普通文件 |
+| 分享 | createLink view/anonymous，复用已有链接；expirationDateTime 按服务端返回展示；组织策略禁止时保留文件 |
+| 限流 | 429、5xx 和网络失败进入任务级有限退避；401 刷新一次，永久 4xx 不自动重试 |
+| 大小 | 分片缓冲固定 5 MiB；最终上限由微软账号空间及服务限制决定，不伪造秒传 |
+| 边界 | 全球云端点；独立主权云不支持。无真实凭据时只能验收本地测试、构建和模拟页面 |
+
+Google 本次保留现有 Desktop OAuth、drive.file、8 MiB resumable 和 anyone/reader 分享，新增跨平台分享重试复用修复及回归检查。

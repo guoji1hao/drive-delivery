@@ -1,5 +1,6 @@
 pub mod baidu;
 pub mod google;
+pub mod onedrive;
 
 use crate::{
     errors::AppResult,

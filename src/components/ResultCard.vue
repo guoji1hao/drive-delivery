@@ -10,7 +10,7 @@ const emit = defineEmits<{
 
 <template>
   <section
-    v-if="task.baidu.share.url || task.baidu.share.notice || task.google.share.url || task.google.share.notice"
+    v-if="task.baidu.share.url || task.baidu.share.notice || task.google.share.url || task.google.share.notice || task.onedrive.share.url || task.onedrive.share.notice"
     class="result-card"
   >
     <div class="result-grid">
@@ -57,6 +57,28 @@ const emit = defineEmits<{
         <div v-if="task.google.share.url" class="share-meta">
           <span v-if="task.google.share.code">提取码：{{ task.google.share.code }}</span>
           <span>有效期：{{ formatDate(task.google.share.expiresAt) }}</span>
+        </div>
+      </div>
+      <div class="share-block">
+        <div class="share-title">
+          <strong>OneDrive</strong>
+          <button
+            class="copy-link"
+            :disabled="!task.onedrive.share.url && !task.onedrive.share.notice"
+            @click="emit('copy', 'onedrive')"
+          >复制 OneDrive</button>
+        </div>
+        <a
+          v-if="task.onedrive.share.url"
+          :href="task.onedrive.share.url"
+          target="_blank"
+        >
+          {{ task.onedrive.share.url }}
+        </a>
+        <p v-else class="share-notice">{{ task.onedrive.share.notice || "暂未生成分享链接" }}</p>
+        <div v-if="task.onedrive.share.url" class="share-meta">
+          <span v-if="task.onedrive.share.code">提取码：{{ task.onedrive.share.code }}</span>
+          <span>有效期：{{ task.onedrive.share.expiresAt ? formatDate(task.onedrive.share.expiresAt) : "以微软平台策略为准" }}</span>
         </div>
       </div>
     </div>

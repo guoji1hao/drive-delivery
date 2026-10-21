@@ -31,6 +31,7 @@ impl SettingsService {
         }
         settings.baidu_default_dir = normalize_dir(&settings.baidu_default_dir);
         settings.google_default_dir = normalize_dir(&settings.google_default_dir);
+        settings.onedrive_default_dir = normalize_dir(&settings.onedrive_default_dir);
         if !settings.baidu_default_dir.starts_with("/apps/") {
             return Err(AppError::Configuration(
                 "百度开放平台上传目录必须位于 /apps/应用目录/ 下".to_string(),

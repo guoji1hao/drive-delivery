@@ -9,6 +9,7 @@ pub fn format_task(task: &UploadTask, settings: &AppSettings) -> String {
         &task.file_name,
         &task.baidu.share,
         &task.google.share,
+        &task.onedrive.share,
     )
 }
 
@@ -23,6 +24,11 @@ pub fn format_task_for(
             "百度网盘",
             &task.file_name,
             &task.baidu.share,
+        )),
+        Some("onedrive") => Ok(format_platform(
+            "OneDrive",
+            &task.file_name,
+            &task.onedrive.share,
         )),
         Some("google") => Ok(format_platform(
             "Google Drive",
@@ -54,14 +60,23 @@ pub fn format_history_for(
         &record.google_share_id,
         &record.google_path,
     );
+    let onedrive = history_share(
+        &record.onedrive_url,
+        &record.onedrive_code,
+        record.onedrive_expires_at,
+        &record.onedrive_share_id,
+        &record.onedrive_path,
+    );
     match provider {
         None | Some("all") => Ok(apply_template(
             &settings.copy_template,
             &record.file_name,
             &baidu,
             &google,
+            &onedrive,
         )),
         Some("baidu") => Ok(format_platform("百度网盘", &record.file_name, &baidu)),
+        Some("onedrive") => Ok(format_platform("OneDrive", &record.file_name, &onedrive)),
         Some("google") => Ok(format_platform("Google Drive", &record.file_name, &google)),
         Some(value) => Err(AppError::Configuration(format!(
             "不支持的复制平台：{value}"
@@ -108,6 +123,7 @@ fn apply_template(
     filename: &str,
     baidu: &ShareResult,
     google: &ShareResult,
+    onedrive: &ShareResult,
 ) -> String {
     template
         .replace("{filename}", filename)
@@ -115,6 +131,8 @@ fn apply_template(
         .replace("{baidu_code_line}", &code_line(baidu))
         .replace("{google_url}", share_value(google))
         .replace("{google_code_line}", &code_line(google))
+        .replace("{onedrive_url}", share_value(onedrive))
+        .replace("{onedrive_code_line}", &code_line(onedrive))
         .lines()
         .filter(|line| !line.trim().is_empty())
         .collect::<Vec<_>>()
@@ -144,6 +162,22 @@ mod tests {
     use crate::models::ShareResult;
 
     #[test]
+    fn includes_onedrive_in_default_template() {
+        let output = apply_template(
+            &crate::models::AppSettings::default().copy_template,
+            "中文.zip",
+            &ShareResult::default(),
+            &ShareResult::default(),
+            &ShareResult {
+                url: Some("https://example.test/ms".into()),
+                ..ShareResult::default()
+            },
+        );
+        assert!(output.contains("OneDrive：\nhttps://example.test/ms"));
+        assert!(!output.contains("{onedrive"));
+    }
+
+    #[test]
     fn empty_codes_do_not_leave_code_lines() {
         let output = apply_template(
             "文件：{filename}\n百度：{baidu_url}\n{baidu_code_line}\nGoogle：{google_url}\n{google_code_line}",
@@ -156,6 +190,7 @@ mod tests {
                 url: Some("https://drive.google.com/file/d/demo/view".into()),
                 ..ShareResult::default()
             },
+            &ShareResult::default(),
         );
         assert!(!output.contains("提取码"));
         assert!(output.contains("drive.google.com"));

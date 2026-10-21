@@ -28,8 +28,8 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "shortDescription": "文件并行上传百度网盘和 Google Drive 并整理分享结果",
-    "longDescription": "双盘发货助手支持拖入文件或文件夹，并行处理百度网盘和 Google Drive 上传任务、保存历史记录并一键复制分享文案。",
+    "shortDescription": "文件并行上传百度网盘、Google Drive 和 OneDrive 并整理分享结果",
+    "longDescription": "双盘发货助手支持拖入文件或文件夹，并行处理百度网盘、Google Drive 和 OneDrive 上传任务、保存历史记录并一键复制分享文案。",
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",

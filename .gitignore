@@ -31,3 +31,9 @@ target
 *.njsproj
 *.sln
 *.sw?
+
+# Project-local AOCI host and runtime
+.codex/config.toml
+
+.playwright-cli/
+output/

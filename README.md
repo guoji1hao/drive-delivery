@@ -1,12 +1,12 @@
 # 双盘发货助手
 
-双盘发货助手是一款 Windows 本地桌面工具。把单个文件、多个文件或文件夹拖入窗口后，程序会同时调用百度网盘与 Google Drive 官方 API 上传，按平台独立显示真实进度，自动尝试创建分享，并把可用结果整理为一键复制的发货文案。
+双盘发货助手是一款 Windows 本地桌面工具。把单个文件、多个文件或文件夹拖入窗口后，程序会同时调用百度网盘、Google Drive 与 OneDrive 官方 API 上传，按平台独立显示真实进度，自动尝试创建分享，并把可用结果整理为一键复制的发货文案。
 
-项目使用 Tauri 2、Vue 3、TypeScript、Vite、Rust 与 SQLite。它不会使用 Cookie、账号密码、抓包或逆向私有接口，也不会伪造平台能力。当前能力边界以 2026-08-30 核验的官方资料为准，详见 [API 调研记录](docs/API_RESEARCH.md)。
+项目使用 Tauri 2、Vue 3、TypeScript、Vite、Rust 与 SQLite。它不会使用 Cookie、账号密码、抓包或逆向私有接口，也不会伪造平台能力。当前能力边界以 2026-10-21 核验的官方资料为准，详见 [API 调研记录](docs/API_RESEARCH.md)。
 
 ## 当前已实现
 
-支持文件与文件夹拖放，文件夹会递归展开为独立文件任务。百度和 Google 在同一文件内并行运行；任一平台失败不会取消另一平台，暂停、取消和重试也按平台独立执行。
+支持文件与文件夹拖放，文件夹会递归展开为独立文件任务。百度、Google 和 OneDrive 在同一文件内并行运行；任一平台失败不会取消另一平台，暂停、取消和重试也按平台独立执行。
 
 使用流式 SHA-256 与文件大小识别重复文件，不把完整文件读入内存。历史中已有有效分享时直接复用；链接失效时只重新创建分享；某个平台缺少上传记录时只补传该平台。
 
@@ -16,7 +16,7 @@ Google 使用官方桌面 OAuth 2.0，打开系统浏览器并监听随机 `127.
 
 OAuth 应用凭据、Access Token 与 Refresh Token 保存到 Windows Credential Manager。Token 过期前自动刷新，刷新失败后才提示重新授权。
 
-SQLite 保存任务、断点、设置与历史记录。程序异常退出后，未完成任务会恢复为暂停状态。历史页支持按文件名搜索，并可复制百度、Google 或全部分享文案。
+SQLite 保存任务、断点、设置与历史记录。程序异常退出后，未完成任务会恢复为暂停状态。历史页支持按文件名搜索，并可复制百度、Google、OneDrive 或全部分享文案。
 
 本地日志使用 JSONL，只记录必要的任务和错误信息，并遮盖 Token、Secret、Cookie 与 Authorization 等敏感字段。设置页可直接打开日志目录。
 
@@ -77,6 +77,18 @@ npm.cmd run tauri build -- --bundles nsis
 
 授权时只请求 `https://www.googleapis.com/auth/drive.file`。首次同意后会获得 Refresh Token；以后程序自动刷新。若出现 `invalid_grant`，在设置页清除 Google 授权后重新绑定。
 
+## Microsoft OneDrive 接入
+
+在 [Microsoft Entra 应用注册](https://entra.microsoft.com/)中创建应用，支持的账号类型选择“任何组织目录中的账号和个人 Microsoft 账号”。在 Authentication 的高级设置中允许公共客户端流；Microsoft Graph 使用委托权限 `Files.ReadWrite`，并请求 `offline_access` 以自动刷新。只需 Application (client) ID，无需创建 Client Secret，也无需配置回调地址。
+
+在设置页填写 Client ID，点击“绑定 Microsoft OneDrive”，在微软官方页面输入界面显示的设备码并确认。应用使用全球云端点；世纪互联、政府云等独立云端点不在本次支持范围内。企业条件访问策略可能禁止设备码授权。
+
+OneDrive 按目录逐层查找或创建，非空文件使用 5 MiB 分片上传，恢复时查询微软返回的 `nextExpectedRanges`。远端文件名追加任务 ID（保留扩展名），防止覆盖用户同名文件，并允许最后一次响应丢失后找回提交结果。已有结果只重新创建分享，不重新上传。上传会话 URL 是敏感恢复元数据，保存在本机 SQLite，不记录到日志。
+
+分享调用 `createLink` 创建 `view/anonymous` 链接，组织可能禁止匿名分享。指定有效期时发送 `expirationDateTime`，展示服务端实际返回的有效期，不保证“永久”。分享失败保留远端文件，修改设置或组织策略后可按平台重试。
+
+旧双盘任务的 OneDrive 项迁移为暂停，可手动继续；默认复制模板自动升级为三平台，自定义模板保持原样，可添加 `{onedrive_url}` 与 `{onedrive_code_line}`。
+
 ## 环境变量
 
 复制 `.env.example` 为 `.env` 仅用于本机开发，不要提交 `.env`。
@@ -86,6 +98,7 @@ BAIDU_APP_KEY=
 BAIDU_SECRET_KEY=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+ONEDRIVE_CLIENT_ID=
 ```
 
 这些值是开发期可选初值。生产使用建议在设置页写入 Windows Credential Manager。
@@ -112,18 +125,20 @@ Google 使用官方 installed app loopback flow。每次授权时程序先监听
 
 ```text
 src/
-  components/          Vue 拖放、双平台任务、结果、历史和设置组件
+  components/          Vue 拖放、三平台任务、结果、历史和设置组件
   services/            Tauri 命令调用封装
   types/               TypeScript 统一类型
   utils/               格式化与测试
 src-tauri/src/
   adapters/baidu.rs    BaiduDriveAdapter
   adapters/google.rs   GoogleDriveAdapter
+  adapters/onedrive.rs OneDriveAdapter
   auth.rs              百度 OAuth 与统一认证管理器
   auth/google.rs       Google loopback OAuth、PKCE 与 Token Refresh
+  auth/onedrive.rs     Microsoft 设备码、服务端轮询节流与 Token Refresh
   database.rs          SQLite 任务、历史、设置与兼容迁移
-  task_manager.rs      Hash、去重、双平台并发与独立控制
-  share_manager.rs     双平台复制文本模板
+  task_manager.rs      Hash、去重、三平台并发与独立控制
+  share_manager.rs     三平台复制文本模板
   secret_store.rs      Windows Credential Manager
   logging.rs           JSONL 日志与脱敏
   commands.rs          Tauri 命令边界
