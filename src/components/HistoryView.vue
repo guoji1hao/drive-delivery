@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from "../i18n";
 import { onMounted, ref, watch } from "vue";
 import type { HistoryRecord, Provider } from "../types";
 import { api } from "../services/api";
@@ -42,31 +43,31 @@ onMounted(search);
   <section class="page-panel history-page">
     <div class="page-heading">
       <div>
-        <span class="eyebrow">本地 SQLite</span>
-        <h2>历史记录</h2>
-        <p>分享结果保存在本机，再次复制不需要重新上传。</p>
+        <span class="eyebrow">{{ t("本地 SQLite") }}</span>
+        <h2>{{ t("历史记录") }}</h2>
+        <p>{{ t("分享结果保存在本机，再次复制不需要重新上传。") }}</p>
       </div>
       <label class="search-box">
         <span>⌕</span>
-        <input v-model="query" placeholder="按文件名搜索" />
+        <input v-model="query" :placeholder="t('按文件名搜索')" />
       </label>
     </div>
 
-    <div v-if="loading" class="empty-state">正在读取历史记录…</div>
+    <div v-if="loading" class="empty-state">{{ t("正在读取历史记录…") }}</div>
     <div v-else-if="!records.length" class="empty-state">
-      <strong>还没有匹配的历史记录</strong>
-      <p>完成一次上传后，文件与分享信息会出现在这里。</p>
+      <strong>{{ t("还没有匹配的历史记录") }}</strong>
+      <p>{{ t("完成一次上传后，文件与分享信息会出现在这里。") }}</p>
     </div>
     <div v-else class="history-table-wrap">
       <table class="history-table">
         <thead>
           <tr>
-            <th>文件</th>
-            <th>上传时间</th>
-            <th>百度</th>
+            <th>{{ t("文件") }}</th>
+            <th>{{ t("上传时间") }}</th>
+            <th>{{ t("百度") }}</th>
             <th>Google</th>
             <th>OneDrive</th>
-            <th>状态</th>
+            <th>{{ t("状态") }}</th>
             <th />
           </tr>
         </thead>
@@ -76,23 +77,23 @@ onMounted(search);
               <strong>{{ record.fileName }}</strong>
               <span>{{ formatBytes(record.fileSize) }}</span>
             </td>
-            <td>{{ formatDate(record.uploadedAt) }}</td>
+            <td>{{ t(formatDate(record.uploadedAt)) }}</td>
             <td>
-              <a v-if="record.baiduUrl" :href="record.baiduUrl" target="_blank">已生成</a>
-              <span v-else>无链接</span>
+              <a v-if="record.baiduUrl" :href="record.baiduUrl" target="_blank">{{ t("已生成") }}</a>
+              <span v-else>{{ t("无链接") }}</span>
             </td>
             <td>
-              <a v-if="record.googleUrl" :href="record.googleUrl" target="_blank">已生成</a>
-              <span v-else>无链接</span>
+              <a v-if="record.googleUrl" :href="record.googleUrl" target="_blank">{{ t("已生成") }}</a>
+              <span v-else>{{ t("无链接") }}</span>
             </td>
             <td>
-              <a v-if="record.onedriveUrl" :href="record.onedriveUrl" target="_blank">已生成</a>
-              <span v-else>无链接</span>
+              <a v-if="record.onedriveUrl" :href="record.onedriveUrl" target="_blank">{{ t("已生成") }}</a>
+              <span v-else>{{ t("无链接") }}</span>
             </td>
-            <td>{{ taskStateText[record.taskStatus] }}</td>
+            <td>{{ t(taskStateText[record.taskStatus]) }}</td>
             <td>
               <div class="history-actions">
-                <button class="copy-link" :disabled="!record.baiduUrl" @click="copy(record, 'baidu')">百度</button>
+                <button class="copy-link" :disabled="!record.baiduUrl" @click="copy(record, 'baidu')">{{ t("百度") }}</button>
                 <button class="copy-link" :disabled="!record.googleUrl" @click="copy(record, 'google')">Google</button>
                 <button class="copy-link" :disabled="!record.onedriveUrl" @click="copy(record, 'onedrive')">OneDrive</button>
                 <button
@@ -100,7 +101,7 @@ onMounted(search);
                   :disabled="!record.baiduUrl && !record.googleUrl && !record.onedriveUrl"
                   @click="copy(record, 'all')"
                 >
-                  复制全部
+                  {{ t("复制全部") }}
                 </button>
               </div>
             </td>

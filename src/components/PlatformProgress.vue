@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from "../i18n";
 import { computed } from "vue";
 import type { PlatformTask, Provider } from "../types";
 import {
@@ -35,12 +36,12 @@ const tone = computed(() => {
     <header>
       <div class="provider-name">
         <span class="provider-dot" :class="provider" />
-        <strong>{{ name }}</strong>
+        <strong>{{ t(name) }}</strong>
       </div>
-      <span class="state-label">{{ platformStateText[value.state] }}</span>
+      <span class="state-label">{{ t(platformStateText[value.state]) }}</span>
     </header>
 
-    <div class="progress-track" aria-label="上传进度">
+    <div class="progress-track" :aria-label="t('上传进度')">
       <div class="progress-value" :style="{ width: `${value.progress}%` }" />
     </div>
     <div class="progress-meta">
@@ -53,7 +54,7 @@ const tone = computed(() => {
     <p v-if="value.remotePath" class="remote-path" :title="value.remotePath">
       {{ value.remotePath }}
     </p>
-    <p v-if="value.error" class="platform-error">{{ value.error }}</p>
+    <p v-if="value.error" class="platform-error">{{ t(value.error) }}</p>
 
     <footer v-if="isBusy(value.state) || canRetry(value.state)">
       <button
@@ -61,21 +62,21 @@ const tone = computed(() => {
         class="text-button"
         @click="emit('pause')"
       >
-        暂停
+        {{ t("暂停") }}
       </button>
       <button
         v-if="isBusy(value.state)"
         class="text-button danger-text"
         @click="emit('cancel')"
       >
-        取消
+        {{ t("取消") }}
       </button>
       <button
         v-if="canRetry(value.state)"
         class="small-button"
         @click="emit('retry')"
       >
-        {{ value.state === "paused" ? "继续" : "重试" }}
+        {{ t(value.state === "paused" ? "继续" : "重试") }}
       </button>
     </footer>
   </article>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t, tf } from "../i18n";
 import { computed, onBeforeUnmount, ref } from "vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../services/api";
@@ -122,7 +123,7 @@ async function bind(saveConfig = false) {
       if (result.authenticated) {
         emit("changed", { provider: props.provider, authenticated: true, available: true, expiresAt: result.expiresAt, message: "已绑定，下次打开无需重复登录" });
         message.value = "绑定成功！回到“发货任务”，拖入文件就能上传。";
-        emit("toast", `${guide.value.name}已绑定`);
+        emit("toast", tf("{drive}已绑定", "{drive} connected", { drive: t(guide.value.name) }));
         return;
       }
       if (!result.pending) throw new Error("授权未完成");
@@ -153,73 +154,73 @@ async function unbind() {
 </script>
 
 <template>
-  <section class="settings-card auth-card binding-card" :class="{ 'setup-expanded': setupOpen }" :aria-label="guide.name + '绑定'">
+  <section class="settings-card auth-card binding-card" :class="{ 'setup-expanded': setupOpen }" :aria-label="tf('{drive}绑定', 'Connect {drive}', { drive: t(guide.name) })">
     <div class="card-title-row">
-      <div><span class="provider-dot" :class="provider" /><strong>{{ guide.name }}</strong></div>
-      <span class="status-chip" :class="{ online: status?.authenticated }">{{ status?.authenticated ? '已绑定' : '未绑定' }}</span>
+      <div><span class="provider-dot" :class="provider" /><strong>{{ t(guide.name) }}</strong></div>
+      <span class="status-chip" :class="{ online: status?.authenticated }">{{ t(status?.authenticated ? '已绑定' : '未绑定') }}</span>
     </div>
-    <p v-if="status?.authenticated" class="binding-description">已经可以上传了，下次打开不用再登录。</p>
+    <p v-if="status?.authenticated" class="binding-description">{{ t("已经可以上传了，下次打开不用再登录。") }}</p>
     <template v-else>
-      <p class="binding-description">{{ guide.hint }}</p>
-      <button class="primary-button bind-button" :disabled="busy" @click="bind()">{{ busy ? '等你在网页确认…' : `绑定${guide.name}` }}</button>
-      <p class="binding-footnote">{{ status?.available ? '配置已保存，直接登录就行。' : '首次使用还需要应用配置，点绑定后会显示操作说明。' }}</p>
+      <p class="binding-description">{{ t(guide.hint) }}</p>
+      <button class="primary-button bind-button" :disabled="busy" @click="bind()">{{ t(busy ? '等你在网页确认…' : tf("绑定{drive}", "Connect {drive}", { drive: t(guide.name) })) }}</button>
+      <p class="binding-footnote">{{ t(status?.available ? '配置已保存，直接登录就行。' : '首次使用还需要应用配置，点绑定后会显示操作说明。') }}</p>
     </template>
 
     <div v-if="challenge" class="binding-wait" aria-live="polite">
       <template v-if="challenge.userCode">
-        <p>把这个验证码填到刚打开的官方网页：</p>
+        <p>{{ t("把这个验证码填到刚打开的官方网页：") }}</p>
         <strong class="device-code">{{ challenge.userCode }}</strong>
-        <button class="small-button" @click="copyCode">{{ codeCopied ? '已复制，再复制一次' : '复制验证码' }}</button>
-        <p>{{ codeCopied ? '已复制，去网页按 Ctrl+V 粘贴。' : '也可以选中验证码，按 Ctrl+C 复制。' }}</p>
+        <button class="small-button" @click="copyCode">{{ t(codeCopied ? '已复制，再复制一次' : '复制验证码') }}</button>
+        <p>{{ t(codeCopied ? '已复制，去网页按 Ctrl+V 粘贴。' : '也可以选中验证码，按 Ctrl+C 复制。') }}</p>
       </template>
-      <p v-else>在 Google 网页选择账号并同意，完成后这里会自动变成“已绑定”。</p>
+      <p v-else>{{ t("在 Google 网页选择账号并同意，完成后这里会自动变成“已绑定”。") }}</p>
       <div class="binding-actions">
-        <button class="small-button" @click="openOfficial(challenge.verificationUrl)">重新打开登录页</button>
-        <button class="text-button" @click="stopWaiting(); message = '已停止等待。网页上的登录也请关闭，需要时可重新绑定。'">暂时不绑</button>
+        <button class="small-button" @click="openOfficial(challenge.verificationUrl)">{{ t("重新打开登录页") }}</button>
+        <button class="text-button" @click="stopWaiting(); message = '已停止等待。网页上的登录也请关闭，需要时可重新绑定。'">{{ t("暂时不绑") }}</button>
       </div>
     </div>
-    <p v-if="message" class="binding-message" role="status">{{ message }}</p>
+    <p v-if="message" class="binding-message" role="status">{{ t(message) }}</p>
     <div v-if="error" class="binding-error" role="alert">
-      <p>{{ error }}</p>
-      <details v-if="technicalError"><summary>排查信息</summary><p>{{ technicalError }}</p></details>
+      <p>{{ t(error) }}</p>
+      <details v-if="technicalError"><summary>{{ t("排查信息") }}</summary><p>{{ t(technicalError) }}</p></details>
     </div>
 
     <template v-if="status?.authenticated">
-      <button v-if="!confirmUnbind" class="text-button" :disabled="busy" @click="confirmUnbind = true">换一个账号</button>
+      <button v-if="!confirmUnbind" class="text-button" :disabled="busy" @click="confirmUnbind = true">{{ t("换一个账号") }}</button>
       <div v-else class="binding-wait">
-        <p>先解除本机绑定，再登录另一个账号。网盘里的文件不会删除；旧账号的上传任务请先暂停。</p>
-        <button class="small-button" :disabled="busy" @click="unbind">解除绑定</button>
-        <button class="text-button" @click="confirmUnbind = false">保留当前账号</button>
+        <p>{{ t("先解除本机绑定，再登录另一个账号。网盘里的文件不会删除；旧账号的上传任务请先暂停。") }}</p>
+        <button class="small-button" :disabled="busy" @click="unbind">{{ t("解除绑定") }}</button>
+        <button class="text-button" @click="confirmUnbind = false">{{ t("保留当前账号") }}</button>
       </div>
     </template>
 
     <details v-else class="binding-setup" :open="setupOpen" @toggle="setupOpen = ($event.target as HTMLDetailsElement).open">
-      <summary>{{ status?.available ? '首次设置已完成 · 需要时修改配置' : '首次设置 · 不知道怎么填就看这里' }}</summary>
-      <p class="setup-explanation">这是“让软件获得登录入口”的设置，不是填写你的网盘密码。通常由给你软件的人准备；已经有配置就直接填，只有第一次需要。</p>
+      <summary>{{ t(status?.available ? '首次设置已完成 · 需要时修改配置' : '首次设置 · 不知道怎么填就看这里') }}</summary>
+      <p class="setup-explanation">{{ t("这是“让软件获得登录入口”的设置，不是填写你的网盘密码。通常由给你软件的人准备；已经有配置就直接填，只有第一次需要。") }}</p>
       <div class="binding-actions">
-        <button class="small-button" @click="openOfficial(guide.setupUrl)">打开{{ guide.name }}官方设置页</button>
-        <button class="text-button" @click="openOfficial(guide.helpUrl)">查看官方说明</button>
+        <button class="small-button" @click="openOfficial(guide.setupUrl)">{{ t("打开") }}{{ t(guide.name) }}{{ t("官方设置页") }}</button>
+        <button class="text-button" @click="openOfficial(guide.helpUrl)">{{ t("查看官方说明") }}</button>
       </div>
       <div class="setup-steps">
-        <div v-for="(step, index) in guide.steps" :key="step" class="setup-step"><span>{{ index + 1 }}</span><p>{{ step }}</p></div>
+        <div v-for="(step, index) in guide.steps" :key="step" class="setup-step"><span>{{ index + 1 }}</span><p>{{ t(step) }}</p></div>
       </div>
       <fieldset :disabled="busy">
         <template v-if="provider === 'google'">
-          <label class="config-import"><span>导入 Google 配置文件（推荐）</span><input type="file" accept=".json,application/json" @change="importGoogle" /><small>选择从 Google 下载的 JSON 文件，程序自动填写，不会上传这个文件。</small></label>
-          <p v-if="imported" class="binding-message">配置已读好，直接点“保存并去登录”。</p>
+          <label class="config-import"><span>{{ t("导入 Google 配置文件（推荐）") }}</span><span class="file-picker small-button">{{ t("选择 JSON 文件") }}<input type="file" accept=".json,application/json" @change="importGoogle" /></span><small>{{ t("选择从 Google 下载的 JSON 文件，程序自动填写，不会上传这个文件。") }}</small></label>
+          <p v-if="imported" class="binding-message">{{ t("配置已读好，直接点“保存并去登录”。") }}</p>
           <details :open="manualOpen" @toggle="manualOpen = ($event.target as HTMLDetailsElement).open">
-            <summary>没有文件，手动填写</summary>
-            <label><span>应用编号（Client ID）</span><input v-model="clientId" autocomplete="off" placeholder="以 .apps.googleusercontent.com 结尾" /></label>
-            <label><span>应用密钥（Client Secret，可选）</span><input v-model="secret" type="password" autocomplete="new-password" placeholder="官方配置里有这一项才填写" /></label>
+            <summary>{{ t("没有文件，手动填写") }}</summary>
+            <label><span>{{ t("应用编号（Client ID）") }}</span><input v-model="clientId" autocomplete="off" :placeholder="t('以 .apps.googleusercontent.com 结尾')" /></label>
+            <label><span>{{ t("应用密钥（Client Secret，可选）") }}</span><input v-model="secret" type="password" autocomplete="new-password" :placeholder="t('官方配置里有这一项才填写')" /></label>
           </details>
         </template>
         <template v-else>
-          <label><span>{{ provider === 'baidu' ? '应用编号（App Key / API Key）' : '应用编号（应用程序 / 客户端 ID）' }}</span><input v-model="clientId" autocomplete="off" :placeholder="provider === 'baidu' ? '从百度应用详情复制' : '从微软应用概述复制，不是邮箱或密码'" /></label>
-          <label v-if="provider === 'baidu'"><span>应用密钥（Secret Key）</span><input v-model="secret" type="password" autocomplete="new-password" placeholder="从百度应用详情复制，不是网盘密码" /></label>
+          <label><span>{{ t(provider === 'baidu' ? '应用编号（App Key / API Key）' : '应用编号（应用程序 / 客户端 ID）') }}</span><input v-model="clientId" autocomplete="off" :placeholder="t(provider === 'baidu' ? '从百度应用详情复制' : '从微软应用概述复制，不是邮箱或密码')" /></label>
+          <label v-if="provider === 'baidu'"><span>{{ t("应用密钥（Secret Key）") }}</span><input v-model="secret" type="password" autocomplete="new-password" :placeholder="t('从百度应用详情复制，不是网盘密码')" /></label>
         </template>
-        <button class="small-button" @click="bind(true)">保存并去登录</button>
+        <button class="small-button" @click="bind(true)">{{ t("保存并去登录") }}</button>
       </fieldset>
     </details>
-    <p v-if="provider === 'baidu'" class="binding-footnote">百度当前支持上传；发货用的分享链接仍需到百度网盘里手动创建。</p>
+    <p v-if="provider === 'baidu'" class="binding-footnote">{{ t("百度当前支持上传；发货用的分享链接仍需到百度网盘里手动创建。") }}</p>
   </section>
 </template>

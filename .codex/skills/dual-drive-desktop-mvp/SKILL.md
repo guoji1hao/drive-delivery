@@ -64,3 +64,14 @@ AuthStatus.available 表示已保存应用配置。直接绑定必须复用此�
 设备码复制失败不应中断授权，应保留可选中文本；浏览器打开失败保留 challenge，允许重新打开。轮询提供停止等待与超时提示；停止等待不等于撤销官方授权。SettingsView 使用 v-show 保持在切换页面时继续轮询；销毁时取消计时器并拦截迟到的前端结果。
 
 scripts/binding-smoke.js 覆盖缺配置引导、错误类型导入、正常导入、保存后重绑不重复写配置、网络失败重试、设备码、停止/重启、切页期间完成绑定。仅 Mock IPC，不是正式账号验收。
+
+
+## 网盘插件与英文支持（2026-10-21，0.3.0）
+
+插件注册与生命周期在 src-tauri/src/plugins.rs，通过 Arc<dyn DriveAdapter> 选择内置适配器；plugins/ 中为声明式包，不执行外部代码。校验 4 KiB 上限、deny_unknown_fields、平台白名单与精确 API/版本。状态独立存 SQLite metadata，更新持锁并先落盘再更换内存。不要把此能力描述为可加载任意网盘 DLL。
+
+任务创建时按启用插件标记未选择平台为 skipped；真正开始平台操作前再检查开关，手动重试也检查。已开始的上传可继续，暂停和取消不能被插件开关阻挡。状态聚合排除 skipped，全跳过为 cancelled；历史已成功结果继续保留。不要根据界面隐藏推断后端已停止调度。
+
+中文源文案为翻译键，src/i18n/en.ts 与 guides.ts 分开管理界面和教程。t 在渲染时读取响应式 locale，动态文案用 tf 插值。localStorage 记住界面选择，save_ui_language 同步后端自动复制语言。默认分享文案按当前语言且仅含已有结果；用户自定义模板、文件名和路径不得翻译。安装程序同时启用 English/SimpChinese 和语言选择器。
+
+新增语言要检查长标签、顶部导航、原生 file input 的系统语言和日期格式。自定义文件选择按钮避免原生控件文案混用语言，保留可访问的文件 input。scripts/plugins-language-smoke.js 覆盖重载记忆、安装/停用/移除/导入、拒绝未知版本、教程和用户内容不被翻译；与旧 ui-smoke、binding-smoke 一起验收。截图前滚动到页顶，避免 sticky header 出现在长图中部。真实授权、上传与原生安装仍需单独验收。

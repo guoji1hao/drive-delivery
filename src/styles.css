@@ -1019,3 +1019,16 @@ a {
   .binding-card .binding-description { min-height: 0; }
   .binding-intro { flex-direction: column; align-items: stretch; }
 }
+
+.plugin-manager { margin: 20px 0; padding: 24px; }
+.plugin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 16px 0; }
+.plugin-card { border: 1px solid var(--border, #dce3e9); border-radius: 12px; padding: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.plugin-card .binding-actions { width: 100%; }
+.plugin-import { position: relative; overflow: hidden; cursor: pointer; }
+.plugin-import input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.language-select { border: 1px solid #dce3e9; border-radius: 8px; padding: 8px; background: white; }
+
+.header-tools { display: flex; justify-content: flex-end; align-items: center; gap: 18px; }
+.language-select { width: auto; max-width: 130px; }
+.file-picker { position: relative; display: inline-flex; width: fit-content; overflow: hidden; cursor: pointer; }
+.file-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }

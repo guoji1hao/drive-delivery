@@ -14,6 +14,7 @@ use tauri::State;
 #[tauri::command]
 pub async fn initialize_app(state: State<'_, AppState>) -> AppResult<AppSnapshot> {
     Ok(AppSnapshot {
+        plugins: state.plugins.list(),
         tasks: state.tasks.list_tasks()?,
         settings: state.settings.get()?,
         auth: vec![
@@ -25,6 +26,16 @@ pub async fn initialize_app(state: State<'_, AppState>) -> AppResult<AppSnapshot
         data_dir: state.data_dir.to_string_lossy().to_string(),
         log_dir: state.log.dir().to_string_lossy().to_string(),
     })
+}
+
+#[tauri::command]
+pub fn update_drive_plugin(
+    state: State<'_, AppState>,
+    id: String,
+    action: String,
+    manifest: Option<String>,
+) -> AppResult<Vec<crate::plugins::DrivePlugin>> {
+    state.plugins.update(&id, &action, manifest.as_deref())
 }
 
 #[tauri::command]
@@ -170,12 +181,18 @@ pub fn copy_task_result(
     state: State<'_, AppState>,
     task_id: String,
     provider: Option<String>,
+    language: Option<String>,
 ) -> AppResult<String> {
     let task = state
         .database
         .get_task(&task_id)?
         .ok_or_else(|| crate::errors::AppError::NotFound(task_id.clone()))?;
-    let text = share_manager::format_task_for(&task, &state.settings.get()?, provider.as_deref())?;
+    let text = share_manager::format_task_for(
+        &task,
+        &state.settings.get()?,
+        provider.as_deref(),
+        language.as_deref().unwrap_or("zh-CN"),
+    )?;
     clipboard::copy_text(&text)?;
     Ok(text)
 }
@@ -185,9 +202,14 @@ pub fn copy_history_result(
     state: State<'_, AppState>,
     record: HistoryRecord,
     provider: Option<String>,
+    language: Option<String>,
 ) -> AppResult<String> {
-    let text =
-        share_manager::format_history_for(&record, &state.settings.get()?, provider.as_deref())?;
+    let text = share_manager::format_history_for(
+        &record,
+        &state.settings.get()?,
+        provider.as_deref(),
+        language.as_deref().unwrap_or("zh-CN"),
+    )?;
     clipboard::copy_text(&text)?;
     Ok(text)
 }
@@ -231,4 +253,14 @@ fn capability_reports() -> Vec<CapabilityReport> {
             ],
         },
     ]
+}
+
+#[tauri::command]
+pub fn save_ui_language(state: State<'_, AppState>, language: String) -> AppResult<()> {
+    if !["zh-CN", "en"].contains(&language.as_str()) {
+        return Err(crate::errors::AppError::Configuration(
+            "Unsupported language".into(),
+        ));
+    }
+    state.database.set_metadata("ui_language", &language)
 }

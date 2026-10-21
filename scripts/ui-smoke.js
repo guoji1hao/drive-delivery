@@ -4,13 +4,14 @@ async (page) => {
     const task = { id: 'fixture', batchId: 'fixture', fileName: '中文发货.zip', fileSize: 42, localPath: 'C:/fixture/中文发货.zip', fileHash: 'fixture', createdAt: 1, updatedAt: 1, state: 'completed', baidu: platform('https://example.test/baidu'), google: platform('https://example.test/google'), onedrive: platform('https://example.test/onedrive') };
     const settings = { baiduDefaultDir: '/apps/demo/', googleDefaultDir: '/自动发货/', onedriveDefaultDir: '/自动发货/', datedSubdirectory: false, maxConcurrentFiles: 2, retryLimit: 3, sharePeriodDays: 0, copyTemplate: '{filename}\n{google_url}\n{onedrive_url}', autoCopy: false };
     window.smokeCalls = [];
+    localStorage.removeItem("drive-delivery-language");
     window.__TAURI_INTERNALS__ = {
       metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
       transformCallback: () => 1,
       unregisterCallback: () => {},
       invoke: async (cmd, args) => {
         window.smokeCalls.push({ cmd, args });
-        if (cmd === 'initialize_app') return { tasks: [task], settings, auth: ['baidu', 'google', 'onedrive'].map(provider => ({ provider, authenticated: false, available: false, message: '测试数据：尚未授权' })), capabilities: [], dataDir: 'C:/fixture', logDir: 'C:/fixture/logs' };
+        if (cmd === 'initialize_app') return { plugins: ["baidu", "google", "onedrive"].map(id => ({ manifest: { id, apiVersion: 1, version: "1.0.0" }, installed: true, enabled: true })), tasks: [task], settings, auth: ['baidu', 'google', 'onedrive'].map(provider => ({ provider, authenticated: false, available: false, message: '测试数据：尚未授权' })), capabilities: [], dataDir: 'C:/fixture', logDir: 'C:/fixture/logs' };
         if (cmd === 'search_history') return [{ ...task, uploadedAt: 1, taskStatus: 'completed', baiduUrl: task.baidu.share.url, googleUrl: task.google.share.url, onedriveUrl: task.onedrive.share.url }];
         if (cmd === 'save_settings') return args.settings;
         if (cmd.startsWith('copy_')) return 'fixture copied';

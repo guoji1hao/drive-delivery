@@ -1,6 +1,8 @@
+import { locale, t } from "../i18n";
 import type { PlatformState, TaskState } from "../types";
 
 export const platformStateText: Record<PlatformState, string> = {
+  skipped: "本次未启用",
   waiting: "等待上传",
   hashing: "校验文件",
   uploading: "上传中",
@@ -36,8 +38,8 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatDate(timestamp?: number): string {
-  if (!timestamp) return "永久有效";
-  return new Intl.DateTimeFormat("zh-CN", {
+  if (!timestamp) return t("永久有效");
+  return new Intl.DateTimeFormat(locale.value, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

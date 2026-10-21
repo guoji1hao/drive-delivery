@@ -358,7 +358,7 @@ fn baidu_only_state(state: &PlatformState) -> TaskState {
     match state {
         PlatformState::Completed => TaskState::Completed,
         PlatformState::Paused => TaskState::Paused,
-        PlatformState::Cancelled => TaskState::Cancelled,
+        PlatformState::Cancelled | PlatformState::Skipped => TaskState::Cancelled,
         PlatformState::Waiting => TaskState::Waiting,
         PlatformState::Hashing | PlatformState::Uploading | PlatformState::CreatingShare => {
             TaskState::Processing

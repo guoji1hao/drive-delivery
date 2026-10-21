@@ -6,6 +6,7 @@ mod database;
 mod errors;
 mod logging;
 mod models;
+mod plugins;
 mod secret_store;
 mod settings;
 mod share_manager;
@@ -27,6 +28,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::initialize_app,
             commands::save_settings,
+            commands::save_ui_language,
+            commands::update_drive_plugin,
             commands::save_baidu_credentials,
             commands::start_baidu_auth,
             commands::poll_baidu_auth,

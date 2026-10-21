@@ -13,6 +13,7 @@ pub enum PlatformState {
     Failed,
     Retryable,
     Unavailable,
+    Skipped,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -241,6 +242,7 @@ pub struct CapabilityReport {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSnapshot {
+    pub plugins: Vec<crate::plugins::DrivePlugin>,
     pub tasks: Vec<UploadTask>,
     pub settings: AppSettings,
     pub auth: Vec<AuthStatus>,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { t, tf, locale } from "./i18n";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
@@ -55,8 +56,8 @@ async function enqueue(paths: string[]) {
     result.tasks.forEach(updateTask);
     showToast(
       result.duplicates
-        ? `已接收 ${result.accepted} 个文件，其中 ${result.duplicates} 个命中历史记录`
-        : `已接收 ${result.accepted} 个文件，开始并行处理`,
+        ? tf("已接收 {count} 个文件，其中 {duplicates} 个命中历史记录", "Received {count} files; {duplicates} found in history", { count: result.accepted, duplicates: result.duplicates })
+        : tf("已接收 {count} 个文件，开始并行处理", "Received {count} files. Processing now", { count: result.accepted }),
     );
   } catch (error) {
     showToast(String(error));
@@ -84,7 +85,7 @@ async function control(
         ? "该平台任务已暂停"
         : action === "cancel"
           ? "该平台任务已取消"
-          : `已重新执行${provider === "baidu" ? "百度" : provider === "google" ? "Google" : "OneDrive"}任务`,
+          : tf("已重新执行 {drive} 任务", "Restarted {drive} task", { drive: provider }),
     );
   } catch (error) {
     showToast(String(error));
@@ -125,6 +126,8 @@ function replaceSettings(settings: AppSettings) {
   if (snapshot.value) snapshot.value.settings = settings;
 }
 
+watch(locale, () => { if (snapshot.value) api.saveLanguage().catch(error => showToast(String(error))); });
+
 onMounted(async () => {
   try {
     unlistenTask = await listen<UploadTask>("task-update", (event) =>
@@ -140,6 +143,7 @@ onMounted(async () => {
       }
     });
     snapshot.value = await api.initialize();
+    await api.saveLanguage().catch(error => showToast(String(error)));
   } catch (error) {
     fatalError.value = String(error);
   } finally {
@@ -160,42 +164,45 @@ onBeforeUnmount(() => {
       <button class="brand" @click="activeTab = 'tasks'">
         <span class="brand-mark"><i /><i /></span>
         <span>
-          <strong>双盘发货助手</strong>
+          <strong>{{ t("双盘发货助手") }}</strong>
           <small>BAIDU + GOOGLE + ONEDRIVE</small>
         </span>
       </button>
       <nav>
         <button :class="{ active: activeTab === 'tasks' }" @click="activeTab = 'tasks'">
-          发货任务
+          {{ t("发货任务") }}
         </button>
         <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
-          历史记录
+          {{ t("历史记录") }}
         </button>
         <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
-          绑定网盘
+          {{ t("绑定网盘") }}
         </button>
       </nav>
-      <div class="header-status" title="数据仅保存在本机">
-        <span /> 本地安全运行
+      <div class="header-tools">
+      <select v-model="locale" class="language-select" aria-label="Language / 语言"><option value="zh-CN">简体中文</option><option value="en">English</option></select>
+      <div class="header-status" :title="t('数据仅保存在本机')">
+        <span /> {{ t("本地安全运行") }}
+      </div>
       </div>
     </header>
 
     <section v-if="loading" class="boot-screen">
       <div class="spinner" />
-      <p>正在打开本地数据库并恢复任务…</p>
+      <p>{{ t("正在打开本地数据库并恢复任务…") }}</p>
     </section>
 
     <section v-else-if="fatalError" class="boot-screen error-screen">
-      <strong>应用初始化失败</strong>
-      <p>{{ fatalError }}</p>
+      <strong>{{ t("应用初始化失败") }}</strong>
+      <p>{{ t(fatalError) }}</p>
     </section>
 
     <template v-else-if="snapshot">
       <div v-show="activeTab === 'tasks'" class="tasks-page">
         <section class="hero-copy">
-          <span class="eyebrow">一次拖入 · 自动上传</span>
-          <h1>一次拖入，同时送达三个网盘。</h1>
-          <p>百度网盘、Google Drive 与 OneDrive 并行上传，支持真实进度、断点续传、独立重试和历史去重。</p>
+          <span class="eyebrow">{{ t("一次拖入 · 自动上传") }}</span>
+          <h1>{{ t("一次拖入，送达已启用的网盘。") }}</h1>
+          <p>{{ t("百度网盘、Google Drive 与 OneDrive 并行上传，支持真实进度、断点续传、独立重试和历史去重。") }}</p>
         </section>
         <DropZone :active="dragActive" :busy="enqueueBusy" />
         <TaskList
@@ -207,10 +214,10 @@ onBeforeUnmount(() => {
         />
         <section v-if="!tasks.length" class="first-run-note">
           <div>
-            <strong>第一次用？先登录你要用的网盘</strong>
-            <p>点“绑定网盘”，按中文提示登录并同意。绑定好了再拖文件，之后不用重复登录。</p>
+            <strong>{{ t("第一次用？先登录你要用的网盘") }}</strong>
+            <p>{{ t("点“绑定网盘”，按提示登录并同意。绑定好了再拖文件，之后不用重复登录。") }}</p>
           </div>
-          <button class="small-button" @click="activeTab = 'settings'">去绑定网盘</button>
+          <button class="small-button" @click="activeTab = 'settings'">{{ t("去绑定网盘") }}</button>
         </section>
       </div>
 
@@ -218,6 +225,8 @@ onBeforeUnmount(() => {
 
       <SettingsView
         v-show="activeTab === 'settings'"
+        :plugins="snapshot.plugins"
+        @plugins-changed="snapshot.plugins = $event"
         :settings="snapshot.settings"
         :auth="snapshot.auth"
         :capabilities="snapshot.capabilities"
@@ -231,7 +240,7 @@ onBeforeUnmount(() => {
     </template>
 
     <Transition name="toast">
-      <div v-if="toast" class="toast-message">{{ toast }}</div>
+      <div v-if="toast" class="toast-message">{{ t(toast) }}</div>
     </Transition>
   </main>
 </template>

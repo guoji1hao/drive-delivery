@@ -6,12 +6,13 @@ async (page) => {
     window.bindingPending = false;
     window.bindingFail = false;
     const settings = { baiduDefaultDir: '/apps/demo/', googleDefaultDir: '/自动发货/', onedriveDefaultDir: '/自动发货/', datedSubdirectory: false, maxConcurrentFiles: 2, retryLimit: 3, sharePeriodDays: 0, copyTemplate: '{filename}', autoCopy: false };
+    localStorage.removeItem("drive-delivery-language");
     window.__TAURI_INTERNALS__ = {
       metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
       transformCallback: () => 1, unregisterCallback: () => {},
       invoke: async (cmd, args) => {
         window.bindingCalls.push({ cmd, args });
-        if (cmd === 'initialize_app') return { tasks: [], settings, auth: ['baidu', 'google', 'onedrive'].map(provider => ({ provider, authenticated: false, available: false, message: 'fixture' })), capabilities: [], dataDir: 'C:/fixture', logDir: 'C:/fixture/logs' };
+        if (cmd === 'initialize_app') return { plugins: ["baidu", "google", "onedrive"].map(id => ({ manifest: { id, apiVersion: 1, version: "1.0.0" }, installed: true, enabled: true })), tasks: [], settings, auth: ['baidu', 'google', 'onedrive'].map(provider => ({ provider, authenticated: false, available: false, message: 'fixture' })), capabilities: [], dataDir: 'C:/fixture', logDir: 'C:/fixture/logs' };
         if (cmd.startsWith('save_') && cmd.endsWith('_credentials')) return { provider: cmd.split('_')[1], authenticated: false, available: true, message: 'fixture saved' };
         if (cmd.startsWith('clear_')) return { provider: cmd.split('_')[1], authenticated: false, available: true, message: 'fixture cleared' };
         if (cmd.startsWith('start_')) {

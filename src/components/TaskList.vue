@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t, tf } from "../i18n";
 import type { Provider, UploadTask } from "../types";
 import TaskCard from "./TaskCard.vue";
 
@@ -31,10 +32,10 @@ function forwardCopy(taskId: string, provider: Provider | "all") {
   <section v-if="tasks.length" class="task-section">
     <div class="section-heading">
       <div>
-        <span class="eyebrow">实时任务</span>
-        <h2>处理队列</h2>
+        <span class="eyebrow">{{ t("实时任务") }}</span>
+        <h2>{{ t("处理队列") }}</h2>
       </div>
-      <span class="count-pill">{{ tasks.length }} 个文件</span>
+      <span class="count-pill">{{ tf("{count} 个文件", tasks.length === 1 ? "{count} file" : "{count} files", { count: tasks.length }) }}</span>
     </div>
     <div class="task-list">
       <TaskCard

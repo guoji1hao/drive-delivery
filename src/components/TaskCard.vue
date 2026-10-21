@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from "../i18n";
 import type { Provider, UploadTask } from "../types";
 import { formatBytes, taskStateText } from "../utils/format";
 import PlatformProgress from "./PlatformProgress.vue";
@@ -26,15 +27,15 @@ const emit = defineEmits<{
         </p>
       </div>
       <span class="task-state" :class="task.state">
-        {{ taskStateText[task.state] }}
+        {{ t(taskStateText[task.state]) }}
       </span>
     </header>
 
-    <p v-if="task.message" class="task-message">{{ task.message }}</p>
+    <p v-if="task.message" class="task-message">{{ t(task.message) }}</p>
 
     <div class="platform-grid">
       <PlatformProgress
-        name="百度网盘"
+        :name="t('百度网盘')"
         provider="baidu"
         :value="task.baidu"
         @pause="emit('pause', task.id, 'baidu')"

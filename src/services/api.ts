@@ -1,6 +1,8 @@
+import { locale } from "../i18n";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppSettings,
+  DrivePlugin,
   AppSnapshot,
   AuthChallenge,
   AuthPollResult,
@@ -12,6 +14,9 @@ import type {
 } from "../types";
 
 export const api = {
+  saveLanguage: () => invoke<void>("save_ui_language", { language: locale.value }),
+  updatePlugin: (id: Provider, action: "install" | "enable" | "disable" | "remove", manifest?: string) =>
+    invoke<DrivePlugin[]>("update_drive_plugin", { id, action, manifest }),
   initialize: () => invoke<AppSnapshot>("initialize_app"),
   enqueue: (paths: string[]) =>
     invoke<EnqueueResult>("enqueue_paths", { paths }),
@@ -47,9 +52,9 @@ export const api = {
   searchHistory: (query: string) =>
     invoke<HistoryRecord[]>("search_history", { query }),
   copyTaskResult: (taskId: string, provider: Provider | "all" = "all") =>
-    invoke<string>("copy_task_result", { taskId, provider }),
+    invoke<string>("copy_task_result", { taskId, provider, language: locale.value }),
   copyHistoryResult: (
     record: HistoryRecord,
     provider: Provider | "all" = "all",
-  ) => invoke<string>("copy_history_result", { record, provider }),
+  ) => invoke<string>("copy_history_result", { record, provider, language: locale.value }),
 };

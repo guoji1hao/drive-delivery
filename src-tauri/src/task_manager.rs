@@ -1,8 +1,5 @@
 use crate::{
-    adapters::{
-        DriveAdapter, ProgressSink, UploadOutcome, UploadProgress, UploadRequest,
-        baidu::BaiduDriveAdapter, google::GoogleDriveAdapter, onedrive::OneDriveAdapter,
-    },
+    adapters::{DriveAdapter, ProgressSink, UploadOutcome, UploadProgress, UploadRequest},
     clipboard,
     database::Database,
     errors::{AppError, AppResult},
@@ -11,6 +8,7 @@ use crate::{
         AppSettings, EnqueueResult, HistoryRecord, PlatformState, PlatformTask, ShareResult,
         TaskState, UploadTask,
     },
+    plugins::PluginService,
     settings::SettingsService,
     share_manager,
 };
@@ -63,9 +61,7 @@ pub struct TaskManager {
     app: AppHandle,
     database: Arc<Database>,
     settings: Arc<SettingsService>,
-    baidu: Arc<BaiduDriveAdapter>,
-    google: Arc<GoogleDriveAdapter>,
-    onedrive: Arc<OneDriveAdapter>,
+    plugins: Arc<PluginService>,
     log: Arc<LogService>,
     cancellation: AsyncMutex<HashMap<String, CancellationToken>>,
 }
@@ -75,24 +71,29 @@ impl TaskManager {
         app: AppHandle,
         database: Arc<Database>,
         settings: Arc<SettingsService>,
-        baidu: Arc<BaiduDriveAdapter>,
-        google: Arc<GoogleDriveAdapter>,
-        onedrive: Arc<OneDriveAdapter>,
+        plugins: Arc<PluginService>,
         log: Arc<LogService>,
     ) -> Self {
         Self {
             app,
             database,
             settings,
-            baidu,
-            google,
-            onedrive,
+            plugins,
             log,
             cancellation: AsyncMutex::new(HashMap::new()),
         }
     }
 
     pub async fn enqueue_paths(self: &Arc<Self>, paths: Vec<String>) -> AppResult<EnqueueResult> {
+        let enabled: Vec<_> = [Provider::Baidu, Provider::Google, Provider::OneDrive]
+            .into_iter()
+            .filter(|p| self.plugins.enabled(p.key()))
+            .collect();
+        if enabled.is_empty() {
+            return Err(AppError::Configuration(
+                "请先在网盘插件中启用至少一个网盘".into(),
+            ));
+        }
         let path_bufs = paths.into_iter().map(PathBuf::from).collect::<Vec<_>>();
         let files = tokio::task::spawn_blocking(move || expand_files(path_bufs))
             .await
@@ -121,7 +122,7 @@ impl TaskManager {
                 .to_string();
             let now = Utc::now().timestamp();
             let history = self.database.find_history_by_hash(&hash, size)?;
-            let task = if let Some(history) = history {
+            let mut task = if let Some(history) = history {
                 duplicates += 1;
                 duplicate_task(&batch_id, &path, file_name, size, hash, now, history)
             } else {
@@ -141,7 +142,8 @@ impl TaskManager {
                     onedrive: PlatformTask::waiting(size),
                 }
             };
-            let should_start = task.state != TaskState::Duplicate;
+            select_platforms(&mut task, &enabled);
+            let should_start = !matches!(task.state, TaskState::Duplicate | TaskState::Completed);
             self.database.save_task(&task)?;
             self.emit_task(&task);
             tasks.push(task.clone());
@@ -177,6 +179,11 @@ impl TaskManager {
         task_id: &str,
         provider: Provider,
     ) -> AppResult<UploadTask> {
+        if !self.plugins.enabled(provider.key()) {
+            return Err(AppError::Configuration(
+                "请先启用该网盘插件，再重试任务".into(),
+            ));
+        }
         let mut task = self
             .database
             .get_task(task_id)?
@@ -293,7 +300,14 @@ impl TaskManager {
         ) {
             self.database.save_history(&final_task)?;
             if settings.auto_copy {
-                let text = share_manager::format_task(&final_task, &settings);
+                let text = share_manager::format_task(
+                    &final_task,
+                    &settings,
+                    self.database
+                        .get_metadata("ui_language")?
+                        .as_deref()
+                        .unwrap_or("zh-CN"),
+                );
                 if text.contains("http") {
                     let _ = clipboard::copy_text(&text);
                 }
@@ -358,14 +372,18 @@ impl TaskManager {
                 platform.state.clone(),
             )
         };
-        if previous_state == PlatformState::Completed {
+        if matches!(
+            previous_state,
+            PlatformState::Completed | PlatformState::Skipped
+        ) {
             return Ok(());
         }
-        let adapter: Arc<dyn DriveAdapter> = match provider {
-            Provider::Baidu => self.baidu.clone(),
-            Provider::Google => self.google.clone(),
-            Provider::OneDrive => self.onedrive.clone(),
-        };
+        if !self.plugins.enabled(provider.key()) {
+            platform_mut(&mut task.lock(), provider).state = PlatformState::Skipped;
+            self.publish(&task)?;
+            return Ok(());
+        }
+        let adapter: Arc<dyn DriveAdapter> = self.plugins.adapter(provider.key())?;
         let cancel = CancellationToken::new();
         let cancel_key = cancellation_key(&task_id, provider);
         self.cancellation
@@ -549,8 +567,26 @@ fn cancellation_key(task_id: &str, provider: Provider) -> String {
     format!("{task_id}:{}", provider.key())
 }
 
+fn select_platforms(task: &mut UploadTask, enabled: &[Provider]) {
+    for provider in [Provider::Baidu, Provider::Google, Provider::OneDrive] {
+        let target = platform_mut(task, provider);
+        if !enabled.contains(&provider) && target.state != PlatformState::Completed {
+            target.state = PlatformState::Skipped;
+        }
+    }
+    if task.state != TaskState::Duplicate {
+        task.state = overall_state(task);
+    }
+}
+
 fn overall_state(task: &UploadTask) -> TaskState {
-    let states = [&task.baidu.state, &task.google.state, &task.onedrive.state];
+    let states: Vec<_> = [&task.baidu.state, &task.google.state, &task.onedrive.state]
+        .into_iter()
+        .filter(|state| **state != PlatformState::Skipped)
+        .collect();
+    if states.is_empty() {
+        return TaskState::Cancelled;
+    }
     let completed = states
         .iter()
         .filter(|state| **state == &PlatformState::Completed)
@@ -798,6 +834,31 @@ mod tests {
             google_share_id: Some("anyoneWithLink".into()),
             onedrive_share_id: Some("anyoneWithLink".into()),
         }
+    }
+
+    #[test]
+    fn disabled_missing_drives_do_not_prevent_completion_or_lose_history() {
+        let mut record = history();
+        record.baidu_path = None;
+        record.baidu_url = None;
+        record.onedrive_path = None;
+        record.onedrive_url = None;
+        let mut task = duplicate_task(
+            "batch",
+            Path::new("file.zip"),
+            "file.zip".into(),
+            10,
+            "hash".into(),
+            100,
+            record,
+        );
+        super::select_platforms(&mut task, &[Provider::Google]);
+        assert_eq!(task.baidu.state, PlatformState::Skipped);
+        assert_eq!(task.onedrive.state, PlatformState::Skipped);
+        assert_eq!(task.state, TaskState::Completed);
+        assert!(task.google.share.url.is_some());
+        task.google.state = PlatformState::Skipped;
+        assert_eq!(overall_state(&task), TaskState::Cancelled);
     }
 
     #[test]

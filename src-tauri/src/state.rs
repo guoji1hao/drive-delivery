@@ -4,6 +4,7 @@ use crate::{
     database::Database,
     errors::AppResult,
     logging::LogService,
+    plugins::PluginService,
     settings::SettingsService,
     task_manager::TaskManager,
 };
@@ -15,6 +16,7 @@ pub struct AppState {
     pub settings: Arc<SettingsService>,
     pub auth: Arc<AuthManager>,
     pub tasks: Arc<TaskManager>,
+    pub plugins: Arc<PluginService>,
     pub log: Arc<LogService>,
     pub data_dir: PathBuf,
 }
@@ -41,13 +43,15 @@ impl AppState {
         let baidu = Arc::new(BaiduDriveAdapter::new(auth.clone(), log.clone())?);
         let google = Arc::new(GoogleDriveAdapter::new(auth.clone(), log.clone())?);
         let onedrive = Arc::new(OneDriveAdapter::new(auth.clone())?);
+        let plugins = Arc::new(PluginService::new(
+            database.clone(),
+            vec![baidu, google, onedrive],
+        )?);
         let tasks = Arc::new(TaskManager::new(
             app,
             database.clone(),
             settings.clone(),
-            baidu,
-            google,
-            onedrive,
+            plugins.clone(),
             log.clone(),
         ));
         log.info("app", "双盘发货助手启动完成");
@@ -56,6 +60,7 @@ impl AppState {
             settings,
             auth,
             tasks,
+            plugins,
             log,
             data_dir,
         })

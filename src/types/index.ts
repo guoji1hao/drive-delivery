@@ -8,6 +8,7 @@ export type PlatformState =
   | "cancelled"
   | "failed"
   | "retryable"
+  | "skipped"
   | "unavailable";
 
 export type TaskState =
@@ -134,7 +135,14 @@ export interface CapabilityReport {
   limitations: string[];
 }
 
+export interface DrivePlugin {
+  manifest: { id: Provider; apiVersion: number; version: string };
+  installed: boolean;
+  enabled: boolean;
+}
+
 export interface AppSnapshot {
+  plugins: DrivePlugin[];
   tasks: UploadTask[];
   settings: AppSettings;
   auth: AuthStatus[];
