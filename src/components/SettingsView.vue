@@ -1,343 +1,50 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
-import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import type {
-  AppSettings,
-  AuthStatus,
-  CapabilityReport,
-} from "../types";
+import { reactive, ref, watch } from "vue";
+import { openPath } from "@tauri-apps/plugin-opener";
+import type { AppSettings, AuthStatus, CapabilityReport, Provider } from "../types";
 import { api } from "../services/api";
+import DriveBindingCard from "./DriveBindingCard.vue";
 
-const props = defineProps<{
-  settings: AppSettings;
-  auth: AuthStatus[];
-  capabilities: CapabilityReport[];
-  logDir: string;
-  dataDir: string;
-}>();
-
-const emit = defineEmits<{
-  saved: [settings: AppSettings];
-  authChanged: [status: AuthStatus];
-  toast: [message: string];
-}>();
-
+const props = defineProps<{ settings: AppSettings; auth: AuthStatus[]; capabilities: CapabilityReport[]; logDir: string; dataDir: string }>();
+const emit = defineEmits<{ saved: [settings: AppSettings]; authChanged: [status: AuthStatus]; toast: [message: string]; ready: [] }>();
 const form = reactive<AppSettings>({ ...props.settings });
-const appKey = ref("");
-const secretKey = ref("");
-const googleClientId = ref("");
-const onedriveClientId = ref("");
-const onedriveCode = ref<string>();
-const googleClientSecret = ref("");
-const busy = ref<string>();
-const authCode = ref<string>();
-
-watch(
-  () => props.settings,
-  (value) => Object.assign(form, value),
-);
-
-const baiduStatus = computed(() =>
-  props.auth.find((item) => item.provider === "baidu"),
-);
-const onedriveStatus = computed(() => props.auth.find((item) => item.provider === "onedrive"));
-const googleStatus = computed(() =>
-  props.auth.find((item) => item.provider === "google"),
-);
-
+const busy = ref(false);
+const providers: Provider[] = ["baidu", "google", "onedrive"];
+watch(() => props.settings, (value) => Object.assign(form, value));
 async function save() {
-  busy.value = "settings";
+  busy.value = true;
   try {
-    const saved = await api.saveSettings({ ...form });
-    emit("saved", saved);
+    emit("saved", await api.saveSettings({ ...form }));
     emit("toast", "设置已保存");
-  } catch (error) {
-    emit("toast", String(error));
-  } finally {
-    busy.value = undefined;
-  }
+  } catch (error) { emit("toast", String(error)); }
+  finally { busy.value = false; }
 }
-
-async function authorizeBaidu() {
-  if (!appKey.value.trim() || !secretKey.value.trim()) {
-    emit("toast", "请先填写百度 App Key 和 Secret Key");
-    return;
-  }
-  busy.value = "baidu";
-  authCode.value = undefined;
-  try {
-    const configured = await api.saveBaiduCredentials(
-      appKey.value,
-      secretKey.value,
-    );
-    secretKey.value = "";
-    emit("authChanged", configured);
-    const challenge = await api.startBaiduAuth();
-    authCode.value = challenge.userCode;
-    await openUrl(challenge.verificationUrl);
-    const startedAt = Date.now();
-    const expiresAt = startedAt + challenge.expiresIn * 1000;
-    while (Date.now() < expiresAt) {
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, challenge.interval * 1000),
-      );
-      const result = await api.pollBaiduAuth(challenge.deviceCode);
-      if (result.authenticated) {
-        emit("authChanged", {
-          provider: "baidu",
-          authenticated: true,
-          available: true,
-          expiresAt: result.expiresAt,
-          message: result.message,
-        });
-        emit("toast", result.message);
-        authCode.value = undefined;
-        return;
-      }
-    }
-    emit("toast", "百度授权已超时，请重新发起授权");
-  } catch (error) {
-    emit("toast", String(error));
-  } finally {
-    busy.value = undefined;
-  }
-}
-
-async function clearBaidu() {
-  try {
-    const status = await api.clearBaiduAuth();
-    emit("authChanged", status);
-    emit("toast", "已清除本机百度授权，可重新绑定");
-  } catch (error) {
-    emit("toast", String(error));
-  }
-}
-
-async function authorizeGoogle() {
-  if (!googleClientId.value.trim()) {
-    emit("toast", "请先填写 Google OAuth Client ID");
-    return;
-  }
-  busy.value = "google";
-  try {
-    const configured = await api.saveGoogleCredentials(
-      googleClientId.value,
-      googleClientSecret.value.trim() || undefined,
-    );
-    googleClientSecret.value = "";
-    emit("authChanged", configured);
-    const challenge = await api.startGoogleAuth();
-    await openUrl(challenge.verificationUrl);
-    const expiresAt = Date.now() + challenge.expiresIn * 1000;
-    while (Date.now() < expiresAt) {
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, challenge.interval * 1000),
-      );
-      const result = await api.pollGoogleAuth(challenge.deviceCode);
-      if (result.authenticated) {
-        emit("authChanged", {
-          provider: "google",
-          authenticated: true,
-          available: true,
-          expiresAt: result.expiresAt,
-          message: result.message,
-        });
-        emit("toast", result.message);
-        return;
-      }
-    }
-    emit("toast", "Google 授权已超时，请重新发起授权");
-  } catch (error) {
-    emit("toast", String(error));
-  } finally {
-    busy.value = undefined;
-  }
-}
-
-async function clearGoogle() {
-  try {
-    const status = await api.clearGoogleAuth();
-    emit("authChanged", status);
-    emit("toast", "已清除本机 Google 授权，可重新绑定");
-  } catch (error) {
-    emit("toast", String(error));
-  }
-}
-
-async function authorizeOneDrive() {
-  if (!onedriveClientId.value.trim()) {
-    emit("toast", "请先填写 OneDrive OAuth Client ID");
-    return;
-  }
-  busy.value = "onedrive";
-  try {
-    const configured = await api.saveOneDriveCredentials(
-      onedriveClientId.value,
-    );
-    emit("authChanged", configured);
-    const challenge = await api.startOneDriveAuth();
-    onedriveCode.value = challenge.userCode;
-    await openUrl(challenge.verificationUrl);
-    const expiresAt = Date.now() + challenge.expiresIn * 1000;
-    while (Date.now() < expiresAt) {
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, challenge.interval * 1000),
-      );
-      const result = await api.pollOneDriveAuth(challenge.deviceCode);
-      if (result.authenticated) {
-        emit("authChanged", {
-          provider: "onedrive",
-          authenticated: true,
-          available: true,
-          expiresAt: result.expiresAt,
-          message: result.message,
-        });
-        emit("toast", result.message);
-        return;
-      }
-    }
-    emit("toast", "OneDrive 授权已超时，请重新发起授权");
-  } catch (error) {
-    emit("toast", String(error));
-  } finally {
-    busy.value = undefined;
-    onedriveCode.value = undefined;
-  }
-}
-
-async function clearOneDrive() {
-  try {
-    const status = await api.clearOneDriveAuth();
-    emit("authChanged", status);
-    emit("toast", "已清除本机 OneDrive 授权，可重新绑定");
-  } catch (error) {
-    emit("toast", String(error));
-  }
-}
-
 </script>
 
 <template>
   <section class="page-panel settings-page">
     <div class="page-heading">
       <div>
-        <span class="eyebrow">安全与偏好</span>
-        <h2>设置</h2>
-        <p>Token 不写入数据库；各平台敏感凭据均保存在 Windows 凭据管理器。</p>
+        <span class="eyebrow">第一次用，从这里开始</span>
+        <h2>绑定网盘</h2>
+        <p>不用把网盘密码填进软件，只在网盘自己的网页登录。</p>
       </div>
-      <button class="primary-button" :disabled="busy === 'settings'" @click="save">
-        {{ busy === "settings" ? "保存中…" : "保存设置" }}
-      </button>
+
     </div>
 
-    <div class="settings-grid">
-      <section class="settings-card auth-card">
-        <div class="card-title-row">
-          <div>
-            <span class="provider-dot baidu" />
-            <strong>百度网盘授权</strong>
-          </div>
-          <span class="status-chip" :class="{ online: baiduStatus?.authenticated }">
-            {{ baiduStatus?.authenticated ? "已授权" : "未授权" }}
-          </span>
-        </div>
-        <p>{{ baiduStatus?.message }}</p>
-        <template v-if="!baiduStatus?.authenticated">
-          <label>
-            <span>App Key</span>
-            <input v-model="appKey" autocomplete="off" placeholder="开放平台 App Key" />
-          </label>
-          <label>
-            <span>Secret Key</span>
-            <input
-              v-model="secretKey"
-              type="password"
-              autocomplete="new-password"
-              placeholder="仅写入系统安全存储"
-            />
-          </label>
-          <p v-if="authCode" class="auth-code">
-            授权页设备码：<strong>{{ authCode }}</strong>
-          </p>
-          <button class="small-button" :disabled="!!busy" @click="authorizeBaidu">
-            {{ busy === "baidu" ? "等待浏览器授权…" : "绑定百度网盘" }}
-          </button>
-        </template>
-        <button v-else class="text-button danger-text" @click="clearBaidu">
-          清除授权并重新绑定
-        </button>
-      </section>
-
-      <section class="settings-card auth-card">
-        <div class="card-title-row">
-          <div>
-            <span class="provider-dot google" />
-            <strong>Google Drive 授权</strong>
-          </div>
-          <span class="status-chip" :class="{ online: googleStatus?.authenticated }">
-            {{ googleStatus?.authenticated ? "已授权" : "未授权" }}
-          </span>
-        </div>
-        <p>{{ googleStatus?.message }}</p>
-        <template v-if="!googleStatus?.authenticated">
-          <label>
-            <span>OAuth Client ID</span>
-            <input
-              v-model="googleClientId"
-              autocomplete="off"
-              placeholder="桌面应用 Client ID"
-            />
-          </label>
-          <label>
-            <span>Client Secret（可选）</span>
-            <input
-              v-model="googleClientSecret"
-              type="password"
-              autocomplete="new-password"
-              placeholder="若凭据 JSON 中存在则填写"
-            />
-          </label>
-          <p class="field-help">使用系统浏览器和随机 127.0.0.1 回调，无需手工填写回调路径。</p>
-          <button class="small-button" :disabled="!!busy" @click="authorizeGoogle">
-            {{ busy === "google" ? "等待浏览器授权…" : "绑定 Google Drive" }}
-          </button>
-        </template>
-        <button v-else class="text-button danger-text" @click="clearGoogle">
-          清除授权并重新绑定
-        </button>
-      </section>
-
-      <section class="settings-card auth-card">
-        <div class="card-title-row">
-          <div>
-            <span class="provider-dot onedrive" />
-            <strong>Microsoft OneDrive 授权</strong>
-          </div>
-          <span class="status-chip" :class="{ online: onedriveStatus?.authenticated }">
-            {{ onedriveStatus?.authenticated ? "已授权" : "未授权" }}
-          </span>
-        </div>
-        <p>{{ onedriveStatus?.message }}</p>
-        <template v-if="!onedriveStatus?.authenticated">
-          <label>
-            <span>OAuth Client ID</span>
-            <input
-              v-model="onedriveClientId"
-              autocomplete="off"
-              placeholder="桌面应用 Client ID"
-            />
-          </label>
-          <p class="field-help">在 Microsoft Entra 注册应用，允许公共客户端流。支持个人及工作/学校账号，无需 Client Secret。</p>
-          <p v-if="onedriveCode" class="auth-code">授权页设备码：<strong>{{ onedriveCode }}</strong></p>
-          <button class="small-button" :disabled="!!busy" @click="authorizeOneDrive">
-            {{ busy === "onedrive" ? "等待浏览器授权…" : "绑定 Microsoft OneDrive" }}
-          </button>
-        </template>
-        <button v-else class="text-button danger-text" @click="clearOneDrive">
-          清除授权并重新绑定
-        </button>
-      </section>
-
+    <section class="binding-intro">
+      <div><span class="eyebrow">先绑定，再拖文件</span><h3>登录你要用的网盘，照着网页点“同意”就行。</h3>
+      <p>选一个网盘点“绑定” → 在官方网页登录并同意 → 回到这里看到“已绑定”。绑定后会记住，下次不用再来一遍。</p>
+      <p class="binding-footnote">如果提示“首次设置”，说明这份软件还没有该网盘的应用配置。请给你软件的人提供配置，或展开下方中文教程自己设置一次；网盘密码只在官方网页输入。</p></div>
+      <button v-if="auth.some(item => item.authenticated)" class="primary-button" @click="emit('ready')">绑定好了，去发货</button>
+    </section>
+    <div class="binding-grid">
+      <DriveBindingCard v-for="provider in providers" :key="provider" :provider="provider" :status="auth.find(item => item.provider === provider)"
+        @changed="emit('authChanged', $event)" @toast="emit('toast', $event)" />
+    </div>
+    <details class="preferences-panel">
+      <summary>上传位置和其他设置（一般不用改）</summary>
+      <div class="settings-grid">
       <section class="settings-card form-card">
         <h3>上传目录</h3>
         <label>
@@ -400,11 +107,13 @@ async function clearOneDrive() {
         </div>
         <button class="small-button" @click="openPath(logDir)">打开日志目录</button>
       </section>
-    </div>
+      <button class="primary-button" :disabled="busy" @click="save">{{ busy ? '保存中…' : '保存设置' }}</button>
+      </div>
+    </details>
 
-    <section class="capability-section">
-      <span class="eyebrow">官方能力边界</span>
-      <h3>当前 Adapter 实现依据</h3>
+    <details class="capability-section">
+      <summary>查看各网盘支持哪些功能</summary>
+
       <div class="capability-grid">
         <article v-for="item in capabilities" :key="item.provider">
           <strong>{{ item.provider === "baidu" ? "百度网盘" : item.provider === "google" ? "Google Drive" : "OneDrive" }}</strong>
@@ -417,6 +126,6 @@ async function clearOneDrive() {
           </div>
         </article>
       </div>
-    </section>
+    </details>
   </section>
 </template>

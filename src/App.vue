@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
           历史记录
         </button>
         <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
-          设置
+          绑定网盘
         </button>
       </nav>
       <div class="header-status" title="数据仅保存在本机">
@@ -207,22 +207,23 @@ onBeforeUnmount(() => {
         />
         <section v-if="!tasks.length" class="first-run-note">
           <div>
-            <strong>开始前请先完成平台授权</strong>
-            <p>三个平台均使用官方 OAuth。未授权平台会保留为可重试状态，不会伪造上传或分享结果。</p>
+            <strong>第一次用？先登录你要用的网盘</strong>
+            <p>点“绑定网盘”，按中文提示登录并同意。绑定好了再拖文件，之后不用重复登录。</p>
           </div>
-          <button class="small-button" @click="activeTab = 'settings'">前往设置</button>
+          <button class="small-button" @click="activeTab = 'settings'">去绑定网盘</button>
         </section>
       </div>
 
       <HistoryView v-if="activeTab === 'history'" @toast="showToast" />
 
       <SettingsView
-        v-if="activeTab === 'settings'"
+        v-show="activeTab === 'settings'"
         :settings="snapshot.settings"
         :auth="snapshot.auth"
         :capabilities="snapshot.capabilities"
         :log-dir="snapshot.logDir"
         :data-dir="snapshot.dataDir"
+        @ready="activeTab = 'tasks'"
         @saved="replaceSettings"
         @auth-changed="replaceAuth"
         @toast="showToast"

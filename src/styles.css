@@ -972,3 +972,50 @@ a {
 }
 
 .provider-dot.onedrive { background: #0078d4; }
+
+.binding-intro {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 24px;
+  margin-bottom: 20px;
+  border: 1px solid #c9e1dc;
+  border-radius: 16px;
+  background: #eef8f5;
+}
+.binding-intro h3 { margin: 8px 0 12px; font-size: 21px; }
+.binding-intro p { margin: 8px 0; line-height: 1.8; font-size: 14px; }
+.binding-intro > button { flex-shrink: 0; }
+.binding-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.binding-card.setup-expanded { grid-column: 1 / -1; }
+.binding-card.setup-expanded .binding-description { min-height: 0; }
+.binding-card.setup-expanded .bind-button { width: auto; min-width: 180px; }
+.binding-card.setup-expanded fieldset { max-width: 620px; }
+.binding-card .binding-description { min-height: 52px; font-size: 14px; line-height: 1.8; color: var(--ink); }
+.bind-button { width: 100%; padding: 13px 16px; background: var(--teal); font-size: 15px; }
+.binding-card .binding-footnote, .binding-intro .binding-footnote { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.binding-card .binding-message { color: #116457; line-height: 1.8; font-size: 13px; }
+.binding-error { padding: 12px; border-radius: 10px; background: #fff1ec; color: #9b391e; }
+.binding-error p { color: inherit; line-height: 1.8; }
+.binding-setup { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+.binding-card summary, .preferences-panel > summary, .capability-section > summary { cursor: pointer; font-size: 13px; font-weight: 600; line-height: 1.7; }
+.binding-card .setup-explanation { line-height: 1.8; font-size: 13px; }
+.binding-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.setup-step { display: flex; align-items: baseline; gap: 10px; margin: 16px 0; }
+.setup-step > span { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; background: #e7f1f0; color: var(--teal); font-size: 12px; font-weight: 700; }
+.binding-card .setup-step p { margin: 0; font-size: 13px; line-height: 1.85; color: var(--ink); }
+.binding-card fieldset { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+.binding-card fieldset > button { margin-top: 14px; }
+.binding-card fieldset details { margin: 12px 0; }
+.binding-card input[type="file"] { white-space: normal; font-size: 12px; max-width: 100%; }
+.binding-wait { margin: 16px 0; padding: 14px; background: #eef5fc; border-radius: 10px; }
+.binding-wait p { font-size: 13px; line-height: 1.8; }
+.device-code { display: block; margin: 8px 0 16px; font: 700 26px/1.4 monospace; letter-spacing: 2px; user-select: text; overflow-wrap: anywhere; }
+.preferences-panel { margin-top: 24px; padding: 22px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.preferences-panel > .settings-grid { margin-top: 20px; }
+@media (max-width: 1000px) {
+  .binding-grid { grid-template-columns: 1fr; }
+  .binding-card .binding-description { min-height: 0; }
+  .binding-intro { flex-direction: column; align-items: stretch; }
+}

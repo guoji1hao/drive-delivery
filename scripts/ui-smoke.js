@@ -26,9 +26,10 @@ async (page) => {
   if (!await page.evaluate(() => window.smokeCalls.some(c => c.cmd === 'copy_task_result' && c.args.provider === 'onedrive'))) throw new Error('OneDrive task copy did not reach API');
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: 'output/playwright/three-drive-tasks.png', fullPage: true });
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByText('Microsoft OneDrive 授权', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '绑定 Microsoft OneDrive', exact: true }).waitFor();
+  await page.getByRole('button', { name: '绑定网盘', exact: true }).click();
+  await page.getByRole('region', { name: '微软网盘绑定', exact: true }).waitFor();
+  await page.getByRole('button', { name: '绑定微软网盘', exact: true }).waitFor();
+  await page.getByText('上传位置和其他设置（一般不用改）', { exact: true }).click();
   await page.getByLabel('OneDrive 默认目录').fill('/中文目录/');
   await page.getByRole('button', { name: '保存设置', exact: true }).click();
   if (!await page.evaluate(() => window.smokeCalls.some(c => c.cmd === 'save_settings' && c.args.settings.onedriveDefaultDir === '/中文目录/'))) throw new Error('OneDrive directory not saved');

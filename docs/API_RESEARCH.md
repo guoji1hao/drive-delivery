@@ -86,3 +86,7 @@ OAuth Desktop app 无法把 Client Secret 当作真正机密，因此官方协�
 | 边界 | 全球云端点；独立主权云不支持。无真实凭据时只能验收本地测试、构建和模拟页面 |
 
 Google 本次保留现有 Desktop OAuth、drive.file、8 MiB resumable 和 anyone/reader 分享，新增跨平台分享重试复用修复及回归检查。
+
+## 绑定引导复核（2026-10-21）
+
+页面内的首次设置步骤依据 [Google Drive 快速入门](https://developers.google.com/workspace/drive/api/quickstart/python?hl=zh-cn)、[Microsoft 应用注册](https://learn.microsoft.com/zh-cn/entra/identity-platform/quickstart-register-app)、[微软认证流限制](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)和前述百度 OAuth 接入指南。Google 选择 Desktop app、下载配置并为测试应用添加测试用户；微软个人账号需选择包含个人账号的应用类型，设备码需要 public client。普通用户登录时无需了解这些参数；缺少应用配置时仍需发布者或用户先完成首次设置。

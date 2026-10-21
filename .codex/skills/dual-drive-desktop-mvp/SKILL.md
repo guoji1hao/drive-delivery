@@ -54,3 +54,13 @@ OneDrive 分片固定 5 MiB，为 320 KiB 整数倍。uploadUrl 是预授权 URL
 页面检查使用 `scripts/ui-smoke.js`，通过 Playwright CLI `run-code --filename scripts/ui-smoke.js` 执行；需先启动 127.0.0.1:1420。它只 Mock Tauri IPC，不访问网盘。输出图片在 output/playwright，测试目录忽略 Git。没有真实凭据时如实报告本地验收边界。
 
 AOCI 已初始化项目级配置和索引骨架；未加载本项目 MCP 的会话不得 scan 或声称索引 aligned，应在重新打开项目后按实时 Guide 建立索引。
+
+## 面向普通用户的绑定引导（2026-10-21）
+
+绑定交互统一在 DriveBindingCard.vue，平台中文教程与安全导入解析位于 utils/driveBinding.ts。SettingsView 只组合绑定卡片和其他设置。默认显示中文网盘名、绑定按钮和下一步，不默认铺开 Client ID、Secret、PKCE 等术语。首次缺配置时展开完整官方操作路径，不伪装成可直接登录；发布者应用注册、审核不能由前端文案代替。
+
+AuthStatus.available 表示已保存应用配置。直接绑定必须复用此配置，不重复调用 save credentials，尤其不能用空输入覆盖保存的 Secret。仅“保存并去登录”主动写入新配置；Google 官方 Desktop JSON 可导入，限制 64 KiB 并拒绝 Web/service account 类型，不回显解析原文。
+
+设备码复制失败不应中断授权，应保留可选中文本；浏览器打开失败保留 challenge，允许重新打开。轮询提供停止等待与超时提示；停止等待不等于撤销官方授权。SettingsView 使用 v-show 保持在切换页面时继续轮询；销毁时取消计时器并拦截迟到的前端结果。
+
+scripts/binding-smoke.js 覆盖缺配置引导、错误类型导入、正常导入、保存后重绑不重复写配置、网络失败重试、设备码、停止/重启、切页期间完成绑定。仅 Mock IPC，不是正式账号验收。

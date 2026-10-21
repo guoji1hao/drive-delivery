@@ -13,3 +13,9 @@ Windows NSIS 构建命令为 `npm.cmd run tauri build -- --bundles nsis`，安�
 真实账号 OAuth、上传、断网恢复、组织分享策略与安装运行未执行；需要用户自己的 Google Desktop OAuth 和 Microsoft 公共客户端应用。OneDrive 仅使用全球云端点；文件名追加任务 ID，以避免覆盖并恢复丢失的提交响应。
 
 项目 AOCI 配置已生成并核对稳定二进制与本仓库路径，当前会话未加载 AOCI MCP，因此未 scan、未建立语义索引、未声称 aligned。需重新打开项目后按实时 Guide 完成索引。
+
+## 中文绑定流程改进
+
+前端测试现为 5 项通过，新增 Google Desktop JSON 导入及错误文案测试。Playwright scripts/binding-smoke.js 覆盖首次配置提示、错误 JSON 类型、正常导入、保存后重绑、网络失败后重试、验证码显示、停止并重新绑定、切页期间完成绑定；scripts/ui-smoke.js 保持目录保存及三平台复制回归通过。页面证据为 output/playwright/binding-simple.png、binding-google-guide.png、binding-device-code.png 和 binding-success.png。
+
+本次不修改 Rust 协议，前端生产构建与 Windows 安装包重新构建。真实官方账号授权仍未执行；模拟界面通过不表示平台应用已完成发布审核，也不表示安装包已内置公共登录配置。
