@@ -121,6 +121,21 @@ impl DriveAdapter for OneDriveAdapter {
     async fn refresh_token(&self) -> AppResult<()> {
         self.auth.refresh_onedrive_token().await.map(|_| ())
     }
+    async fn ensure_directory(
+        &self,
+        path: &str,
+        _retry_limit: u32,
+        cancel: &CancellationToken,
+    ) -> AppResult<String> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Paused);
+        }
+        let id = self.folder(path).await?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Paused);
+        }
+        Ok(id)
+    }
     async fn upload_file(
         &self,
         request: UploadRequest,

@@ -1,24 +1,19 @@
 <script setup lang="ts">
 import { t } from "../i18n";
-defineProps<{
-  active: boolean;
-  busy: boolean;
-}>();
+defineProps<{ active: boolean; busy: boolean }>();
+const emit = defineEmits<{ chooseFiles: []; chooseFolder: [] }>();
 </script>
 
 <template>
-  <section class="drop-zone" :class="{ active, busy }">
-    <div class="drop-mark" aria-hidden="true">
-      <span>＋</span>
-    </div>
+  <section class="drop-zone" :class="{ active, busy }" :aria-busy="busy">
+    <button class="drop-mark" :disabled="busy" :aria-label="t('选择文件上传')" :title="t('选择文件上传')" @click="emit('chooseFiles')"><span>＋</span></button>
     <div>
-      <h2>{{ t(busy ? "正在读取文件…" : "拖入文件或文件夹") }}</h2>
-      <p>{{ t("松开后自动校验并上传已启用的网盘，支持多文件和完整文件夹") }}</p>
-    </div>
-    <div class="drop-hints">
-      <span>{{ t("流式分片") }}</span>
-      <span>{{ t("断点续传") }}</span>
-      <span>{{ t("历史去重") }}</span>
+      <h2>{{ t(busy ? '正在读取文件…' : '点 + 选文件，也可以直接拖进来') }}</h2>
+      <p>{{ t('整个文件夹也能上传，里面的子目录和空文件夹也会保留。') }}</p>
+      <div class="upload-actions">
+        <button class="small-button" :disabled="busy" @click="emit('chooseFiles')">{{ t('选择文件') }}</button>
+        <button class="small-button" :disabled="busy" @click="emit('chooseFolder')">{{ t('上传整个文件夹') }}</button>
+      </div>
     </div>
   </section>
 </template>

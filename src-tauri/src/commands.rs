@@ -14,6 +14,7 @@ use tauri::State;
 #[tauri::command]
 pub async fn initialize_app(state: State<'_, AppState>) -> AppResult<AppSnapshot> {
     Ok(AppSnapshot {
+        queue: state.tasks.queue_status(),
         plugins: state.plugins.list(),
         tasks: state.tasks.list_tasks()?,
         settings: state.settings.get()?,
@@ -263,4 +264,9 @@ pub fn save_ui_language(state: State<'_, AppState>, language: String) -> AppResu
         ));
     }
     state.database.set_metadata("ui_language", &language)
+}
+
+#[tauri::command]
+pub fn set_queue_paused(state: State<'_, AppState>, paused: bool) -> crate::queue::QueueStatus {
+    state.tasks.set_queue_paused(paused)
 }

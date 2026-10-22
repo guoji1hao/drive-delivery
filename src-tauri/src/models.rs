@@ -83,6 +83,12 @@ impl Default for PlatformTask {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadTask {
+    #[serde(default)]
+    pub destination_dirs: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub relative_dir: String,
+    #[serde(default)]
+    pub is_directory: bool,
     pub id: String,
     pub batch_id: String,
     pub local_path: String,
@@ -242,6 +248,7 @@ pub struct CapabilityReport {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSnapshot {
+    pub queue: crate::queue::QueueStatus,
     pub plugins: Vec<crate::plugins::DrivePlugin>,
     pub tasks: Vec<UploadTask>,
     pub settings: AppSettings,

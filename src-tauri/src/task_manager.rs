@@ -9,8 +9,10 @@ use crate::{
         TaskState, UploadTask,
     },
     plugins::PluginService,
+    queue::{Queue, QueueStatus},
     settings::SettingsService,
     share_manager,
+    upload_selection::expand_selection,
 };
 use chrono::{Local, Utc};
 use parking_lot::Mutex;
@@ -24,12 +26,11 @@ use std::{
 };
 use tauri::{AppHandle, Emitter};
 use tokio::{
-    sync::{Mutex as AsyncMutex, Semaphore},
+    sync::Mutex as AsyncMutex,
     time::{Duration, sleep},
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Provider {
@@ -63,6 +64,7 @@ pub struct TaskManager {
     settings: Arc<SettingsService>,
     plugins: Arc<PluginService>,
     log: Arc<LogService>,
+    queue: Arc<Queue>,
     cancellation: AsyncMutex<HashMap<String, CancellationToken>>,
 }
 
@@ -80,6 +82,7 @@ impl TaskManager {
             settings,
             plugins,
             log,
+            queue: Arc::new(Queue::new(false)),
             cancellation: AsyncMutex::new(HashMap::new()),
         }
     }
@@ -95,38 +98,63 @@ impl TaskManager {
             ));
         }
         let path_bufs = paths.into_iter().map(PathBuf::from).collect::<Vec<_>>();
-        let files = tokio::task::spawn_blocking(move || expand_files(path_bufs))
+        let files = tokio::task::spawn_blocking(move || expand_selection(path_bufs))
             .await
             .map_err(|error| AppError::File(format!("展开文件夹失败：{error}")))??;
         if files.is_empty() {
             return Err(AppError::File("拖入内容中没有可读取的文件".to_string()));
         }
         let batch_id = Uuid::new_v4().to_string();
-        let settings = self.settings.get()?;
-        let semaphore = Arc::new(Semaphore::new(settings.max_concurrent_files as usize));
+
         let mut tasks = Vec::new();
         let mut duplicates = 0;
-        for path in files {
+        let settings = self.settings.get()?;
+        let destinations: std::collections::BTreeMap<String, String> = [
+            ("baidu", &settings.baidu_default_dir),
+            ("google", &settings.google_default_dir),
+            ("onedrive", &settings.onedrive_default_dir),
+        ]
+        .into_iter()
+        .map(|(key, dir)| (key.to_string(), dated_dir(dir, settings.dated_subdirectory)))
+        .collect();
+        for entry in files {
+            let path = entry.path;
             let metadata = tokio::fs::metadata(&path)
                 .await
                 .map_err(|error| AppError::File(format!("无法读取 {}：{error}", path.display())))?;
-            let size = metadata.len();
+            let size = if entry.is_directory {
+                0
+            } else {
+                metadata.len()
+            };
             let hash_path = path.clone();
-            let hash = tokio::task::spawn_blocking(move || sha256_file(&hash_path))
-                .await
-                .map_err(|error| AppError::File(format!("计算文件 Hash 失败：{error}")))??;
+            let hash = if entry.is_directory {
+                Uuid::new_v4().to_string()
+            } else {
+                tokio::task::spawn_blocking(move || sha256_file(&hash_path))
+                    .await
+                    .map_err(|error| AppError::File(format!("计算文件 Hash 失败：{error}")))??
+            };
             let file_name = path
                 .file_name()
                 .and_then(|value| value.to_str())
                 .ok_or_else(|| AppError::File("文件名不是有效 UTF-8".to_string()))?
                 .to_string();
             let now = Utc::now().timestamp();
-            let history = self.database.find_history_by_hash(&hash, size)?;
+            // Folder members must keep their destination, even if identical bytes exist elsewhere.
+            let history = if entry.relative_dir.is_empty() {
+                self.database.find_history_by_hash(&hash, size)?
+            } else {
+                None
+            };
             let mut task = if let Some(history) = history {
                 duplicates += 1;
                 duplicate_task(&batch_id, &path, file_name, size, hash, now, history)
             } else {
                 UploadTask {
+                    destination_dirs: Default::default(),
+                    relative_dir: String::new(),
+                    is_directory: false,
                     id: Uuid::new_v4().to_string(),
                     batch_id: batch_id.clone(),
                     local_path: path.to_string_lossy().to_string(),
@@ -142,21 +170,28 @@ impl TaskManager {
                     onedrive: PlatformTask::waiting(size),
                 }
             };
+            task.destination_dirs = destinations.clone();
+            task.relative_dir = entry.relative_dir;
+            task.is_directory = entry.is_directory;
             select_platforms(&mut task, &enabled);
             let should_start = !matches!(task.state, TaskState::Duplicate | TaskState::Completed);
             self.database.save_task(&task)?;
             self.emit_task(&task);
             tasks.push(task.clone());
             if should_start {
-                let manager = Arc::clone(self);
-                let semaphore = Arc::clone(&semaphore);
-                tokio::spawn(async move {
-                    if let Ok(_permit) = semaphore.acquire_owned().await {
-                        let _ = manager.process_task(&task.id, None).await;
-                    }
-                });
+                self.queue.reserve(&task.id);
+                self.spawn_reserved(task.id.clone(), None);
             }
         }
+        // Jobs can finish while another selection is being hashed; return current persisted states.
+        let tasks = tasks
+            .into_iter()
+            .map(|task| {
+                self.database
+                    .get_task(&task.id)
+                    .map(|current| current.unwrap_or(task))
+            })
+            .collect::<AppResult<Vec<_>>>()?;
         Ok(EnqueueResult {
             accepted: tasks.len(),
             duplicates,
@@ -184,25 +219,69 @@ impl TaskManager {
                 "请先启用该网盘插件，再重试任务".into(),
             ));
         }
-        let mut task = self
-            .database
-            .get_task(task_id)?
-            .ok_or_else(|| AppError::NotFound(task_id.to_string()))?;
-        let target = platform_mut(&mut task, provider);
-        if target.state != PlatformState::Completed {
-            target.state = PlatformState::Waiting;
-            target.error = None;
+        if !self.queue.reserve(task_id) {
+            return Err(AppError::Configuration(
+                "该文件仍在队列中，请等待当前处理结束后重试".into(),
+            ));
         }
-        task.state = TaskState::Processing;
-        task.updated_at = Utc::now().timestamp();
-        self.database.save_task(&task)?;
+        let result = (|| -> AppResult<UploadTask> {
+            let mut task = self
+                .database
+                .get_task(task_id)?
+                .ok_or_else(|| AppError::NotFound(task_id.to_string()))?;
+            let target = platform_mut(&mut task, provider);
+            if target.state != PlatformState::Completed {
+                target.state = PlatformState::Waiting;
+                target.error = None;
+            }
+            task.state = overall_state(&task);
+            task.updated_at = Utc::now().timestamp();
+            self.database.save_task(&task)?;
+            Ok(task)
+        })();
+        let task = match result {
+            Ok(task) => task,
+            Err(error) => {
+                self.queue.release_pending(task_id);
+                return Err(error);
+            }
+        };
         self.emit_task(&task);
-        let manager = Arc::clone(self);
-        let task_id = task_id.to_string();
-        tokio::spawn(async move {
-            let _ = manager.process_task(&task_id, Some(provider)).await;
-        });
+        self.spawn_reserved(task_id.to_string(), Some(provider));
         Ok(task)
+    }
+
+    pub fn queue_status(&self) -> QueueStatus {
+        self.queue.status()
+    }
+
+    pub fn set_queue_paused(&self, paused: bool) -> QueueStatus {
+        self.queue.set_paused(paused);
+        self.emit_queue();
+        self.queue.status()
+    }
+
+    fn emit_queue(&self) {
+        let _ = self.app.emit("queue-update", self.queue.status());
+    }
+
+    fn spawn_reserved(self: &Arc<Self>, task_id: String, provider: Option<Provider>) {
+        self.emit_queue();
+        let manager = Arc::clone(self);
+        tokio::spawn(async move {
+            let limit = manager
+                .settings
+                .get()
+                .map(|s| s.max_concurrent_files as usize)
+                .unwrap_or(1);
+            let slot = manager.queue.acquire(&task_id, limit).await;
+            manager.emit_queue();
+            if let Err(error) = manager.process_task(&task_id, provider).await {
+                manager.log.error("queue", &error.to_string());
+            }
+            drop(slot);
+            manager.emit_queue();
+        });
     }
 
     pub fn list_tasks(&self) -> AppResult<Vec<UploadTask>> {
@@ -374,7 +453,10 @@ impl TaskManager {
         };
         if matches!(
             previous_state,
-            PlatformState::Completed | PlatformState::Skipped
+            PlatformState::Completed
+                | PlatformState::Skipped
+                | PlatformState::Paused
+                | PlatformState::Cancelled
         ) {
             return Ok(());
         }
@@ -406,7 +488,44 @@ impl TaskManager {
             Provider::Google => &settings.google_default_dir,
             Provider::OneDrive => &settings.onedrive_default_dir,
         };
-        let remote_dir = dated_dir(base_dir, settings.dated_subdirectory);
+        let (relative_dir, is_directory) = {
+            let t = task.lock();
+            (t.relative_dir.clone(), t.is_directory)
+        };
+        let remote_dir = format!(
+            "{}{}",
+            task.lock()
+                .destination_dirs
+                .get(provider.key())
+                .cloned()
+                .unwrap_or_else(|| dated_dir(base_dir, settings.dated_subdirectory)),
+            relative_dir
+        );
+        if is_directory {
+            let result = adapter
+                .ensure_directory(&remote_dir, settings.retry_limit, &cancel)
+                .await;
+            self.cancellation.lock().await.remove(&cancel_key);
+            match result {
+                Ok(id) => {
+                    let mut shared = task.lock();
+                    let target = platform_mut(&mut shared, provider);
+                    target.state = PlatformState::Completed;
+                    target.progress = 100.0;
+                    target.remote_id = Some(id);
+                    target.remote_path = Some(remote_dir.clone());
+                    target.share.remote_path = Some(remote_dir);
+                    target.share.notice = Some("文件夹已创建".into());
+                    target.error = None;
+                }
+                Err(error) => {
+                    self.finish_with_error(&task, provider, &error)?;
+                    return Err(error);
+                }
+            }
+            self.publish(&task)?;
+            return Ok(());
+        }
         let progress_task = Arc::clone(&task);
         let database = Arc::clone(&self.database);
         let app = self.app.clone();
@@ -684,6 +803,9 @@ fn duplicate_task(
         || onedrive_needs_upload
         || onedrive_needs_share;
     UploadTask {
+        destination_dirs: Default::default(),
+        relative_dir: String::new(),
+        is_directory: false,
         id: Uuid::new_v4().to_string(),
         batch_id: batch_id.to_string(),
         local_path: path.to_string_lossy().to_string(),
@@ -763,27 +885,6 @@ fn dated_dir(base: &str, enabled: bool) -> String {
     } else {
         base.to_string()
     }
-}
-
-fn expand_files(paths: Vec<PathBuf>) -> AppResult<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    for path in paths {
-        if path.is_file() {
-            files.push(path);
-        } else if path.is_dir() {
-            for entry in WalkDir::new(&path).follow_links(false) {
-                let entry = entry.map_err(|error| AppError::File(error.to_string()))?;
-                if entry.file_type().is_file() {
-                    files.push(entry.into_path());
-                }
-            }
-        } else {
-            return Err(AppError::File(format!("路径不存在：{}", path.display())));
-        }
-    }
-    files.sort();
-    files.dedup();
-    Ok(files)
 }
 
 fn sha256_file(path: &Path) -> AppResult<String> {
@@ -943,6 +1044,9 @@ mod tests {
     #[test]
     fn one_success_is_partial_success() {
         let task = crate::models::UploadTask {
+            destination_dirs: Default::default(),
+            relative_dir: String::new(),
+            is_directory: false,
             id: "1".into(),
             batch_id: "1".into(),
             local_path: "x".into(),

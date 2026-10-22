@@ -25,6 +25,7 @@ pub struct BaiduDriveAdapter {
     auth: Arc<AuthManager>,
     client: Client,
     log: Arc<LogService>,
+    folder_lock: tokio::sync::Mutex<()>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -78,7 +79,12 @@ impl BaiduDriveAdapter {
             .timeout(Duration::from_secs(180))
             .user_agent("dual-drive-assistant/0.2.0")
             .build()?;
-        Ok(Self { auth, client, log })
+        Ok(Self {
+            auth,
+            client,
+            log,
+            folder_lock: tokio::sync::Mutex::new(()),
+        })
     }
 
     async fn compute_block_md5s(path: PathBuf) -> AppResult<Vec<String>> {
@@ -278,6 +284,86 @@ impl DriveAdapter for BaiduDriveAdapter {
         self.auth.refresh_baidu_token().await.map(|_| ())
     }
 
+    async fn ensure_directory(
+        &self,
+        path: &str,
+        retry_limit: u32,
+        cancel: &CancellationToken,
+    ) -> AppResult<String> {
+        let _guard = self.folder_lock.lock().await;
+        let token = self.auth.valid_baidu_access_token().await?;
+        let mut parent = String::new();
+        for name in path.split('/').filter(|s| !s.is_empty()) {
+            if cancel.is_cancelled() {
+                return Err(AppError::Paused);
+            }
+            let target = format!("{parent}/{name}");
+            let mut start = 0;
+            let mut found = false;
+            loop {
+                if cancel.is_cancelled() {
+                    return Err(AppError::Paused);
+                }
+                let result: serde_json::Value = self
+                    .client
+                    .get(FILE_API)
+                    .query(&[
+                        ("method", "list"),
+                        ("access_token", token.as_str()),
+                        ("dir", if parent.is_empty() { "/" } else { &parent }),
+                        ("start", &start.to_string()),
+                        ("limit", "1000"),
+                    ])
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?;
+                if result["errno"].as_i64() != Some(0) {
+                    return Err(AppError::Provider(format!(
+                        "百度目录查询失败（错误码 {}）",
+                        result["errno"]
+                    )));
+                }
+                let list = result["list"]
+                    .as_array()
+                    .ok_or_else(|| AppError::Provider("百度目录查询缺少文件列表".into()))?;
+                if let Some(item) = list
+                    .iter()
+                    .find(|item| item["path"].as_str() == Some(&target))
+                {
+                    if item["isdir"].as_i64() != Some(1) {
+                        return Err(AppError::Configuration("百度目标目录被同名文件占用".into()));
+                    }
+                    found = true;
+                    break;
+                }
+                if list.len() < 1000 {
+                    break;
+                }
+                start += 1000;
+            }
+            if !found {
+                let form = vec![
+                    ("path".into(), target.clone()),
+                    ("isdir".into(), "1".into()),
+                    ("rtype".into(), "0".into()),
+                ];
+                let result: CreateResponse = self
+                    .post_form(&token, "create", &form, retry_limit, cancel)
+                    .await?;
+                if result.errno != 0 {
+                    return Err(AppError::Provider(format!(
+                        "百度创建目录失败（错误码 {}）",
+                        result.errno
+                    )));
+                }
+            }
+            parent = target;
+        }
+        Ok(parent)
+    }
+
     async fn upload_file(
         &self,
         request: UploadRequest,
@@ -290,6 +376,8 @@ impl DriveAdapter for BaiduDriveAdapter {
             return Err(AppError::File("文件不存在或已被移动".to_string()));
         }
         let token = self.auth.valid_baidu_access_token().await?;
+        self.ensure_directory(&request.remote_dir, request.retry_limit, &cancel)
+            .await?;
         let remote_path = format!("{}{}", request.remote_dir, request.file_name);
         let mut resume = request
             .resume_data

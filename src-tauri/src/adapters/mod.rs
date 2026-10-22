@@ -55,6 +55,12 @@ pub trait DriveAdapter: Send + Sync {
         progress: ProgressSink,
         cancel: CancellationToken,
     ) -> AppResult<UploadOutcome>;
+    async fn ensure_directory(
+        &self,
+        path: &str,
+        retry_limit: u32,
+        cancel: &CancellationToken,
+    ) -> AppResult<String>;
     async fn upload_folder(&self, _path: PathBuf) -> AppResult<Vec<UploadOutcome>>;
     async fn get_upload_progress(&self, _task_id: &str) -> AppResult<Option<UploadProgress>>;
     async fn create_share(

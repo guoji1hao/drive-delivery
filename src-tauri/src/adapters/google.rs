@@ -30,6 +30,7 @@ pub struct GoogleDriveAdapter {
     auth: Arc<AuthManager>,
     client: Client,
     log: Arc<LogService>,
+    folder_lock: tokio::sync::Mutex<()>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,7 +82,12 @@ impl GoogleDriveAdapter {
             .timeout(Duration::from_secs(180))
             .user_agent("dual-drive-assistant/0.2.0")
             .build()?;
-        Ok(Self { auth, client, log })
+        Ok(Self {
+            auth,
+            client,
+            log,
+            folder_lock: tokio::sync::Mutex::new(()),
+        })
     }
 
     async fn json_request<T: DeserializeOwned>(
@@ -142,6 +148,7 @@ impl GoogleDriveAdapter {
     }
 
     async fn ensure_folder_path(&self, remote_dir: &str, retry_limit: u32) -> AppResult<String> {
+        let _guard = self.folder_lock.lock().await;
         let mut parent_id = "root".to_string();
         for name in remote_dir
             .trim_matches('/')
@@ -556,6 +563,21 @@ impl DriveAdapter for GoogleDriveAdapter {
         self.auth.refresh_google_token().await.map(|_| ())
     }
 
+    async fn ensure_directory(
+        &self,
+        path: &str,
+        retry_limit: u32,
+        cancel: &CancellationToken,
+    ) -> AppResult<String> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Paused);
+        }
+        let id = self.ensure_folder_path(path, retry_limit).await?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Paused);
+        }
+        Ok(id)
+    }
     async fn upload_file(
         &self,
         request: UploadRequest,

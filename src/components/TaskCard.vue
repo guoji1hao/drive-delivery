@@ -21,7 +21,7 @@ const emit = defineEmits<{
       <div class="file-info">
         <h3 :title="task.fileName">{{ task.fileName }}</h3>
         <p>
-          {{ formatBytes(task.fileSize) }}
+          {{ task.isDirectory ? t("文件夹") : formatBytes(task.fileSize) }}
           <span class="separator">·</span>
           <span :title="task.localPath">{{ task.localPath }}</span>
         </p>
@@ -31,6 +31,7 @@ const emit = defineEmits<{
       </span>
     </header>
 
+    <p v-if="task.relativeDir" class="task-message">{{ t("保留目录") }}：{{ task.relativeDir }}</p>
     <p v-if="task.message" class="task-message">{{ t(task.message) }}</p>
 
     <div class="platform-grid">

@@ -1,6 +1,7 @@
 import { locale } from "../i18n";
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  QueueStatus,
   AppSettings,
   DrivePlugin,
   AppSnapshot,
@@ -14,6 +15,7 @@ import type {
 } from "../types";
 
 export const api = {
+  setQueuePaused: (paused: boolean) => invoke<QueueStatus>("set_queue_paused", { paused }),
   saveLanguage: () => invoke<void>("save_ui_language", { language: locale.value }),
   updatePlugin: (id: Provider, action: "install" | "enable" | "disable" | "remove", manifest?: string) =>
     invoke<DrivePlugin[]>("update_drive_plugin", { id, action, manifest }),

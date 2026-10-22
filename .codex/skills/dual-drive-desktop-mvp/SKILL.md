@@ -75,3 +75,13 @@ scripts/binding-smoke.js 覆盖缺配置引导、错误类型导入、正常导�
 中文源文案为翻译键，src/i18n/en.ts 与 guides.ts 分开管理界面和教程。t 在渲染时读取响应式 locale，动态文案用 tf 插值。localStorage 记住界面选择，save_ui_language 同步后端自动复制语言。默认分享文案按当前语言且仅含已有结果；用户自定义模板、文件名和路径不得翻译。安装程序同时启用 English/SimpChinese 和语言选择器。
 
 新增语言要检查长标签、顶部导航、原生 file input 的系统语言和日期格式。自定义文件选择按钮避免原生控件文案混用语言，保留可访问的文件 input。scripts/plugins-language-smoke.js 覆盖重载记忆、安装/停用/移除/导入、拒绝未知版本、教程和用户内容不被翻译；与旧 ui-smoke、binding-smoke 一起验收。截图前滚动到页顶，避免 sticky header 出现在长图中部。真实授权、上传与原生安装仍需单独验收。
+
+## 文件选择、文件夹与全局队列（2026-10-22，0.4.0）
+
+原生选择器使用 Tauri dialog 插件：前端 open(directory/multiple)，Rust 注册插件，capabilities 只授予 dialog:allow-open。点击 +、选择文件、上传整个文件夹、拖放统一调用 enqueue_paths；取消选择不发任务。JS/Rust 插件锁定兼容小版本。
+
+upload_selection.rs 负责文件展开，canonicalize 去重重叠输入，保留选中根目录及子目录，跳过符号链接，空目录单独排队。任务 JSON 新字段必须 serde default 兼容旧数据库。文件夹成员禁用仅内容历史复用，防止不同目录同内容文件消失。destination_dirs 在入队时固定目标与日期，重试和跨天等待不能重新计算路径。各网盘 ensure_directory 留在 Adapter；Google 查询/创建需串行避免同实例重复目录，百度分页查父目录再 create isdir=1/rtype=0，OneDrive 继续 conflict fail/409 读回。
+
+queue.rs 持有跨批次 FIFO、活动任务集合和暂停门。新批次及手动重试都经同一调度器；禁止同任务并发重试以防共享状态覆盖。暂停停止派发后续项目，当前文件继续完成；不假装中断网络请求。Notify 必须先注册再检查条件避免丢唤醒。任务最终释放槽位并推送 queue-update，入队返回最新数据库状态避免慢 Hash 期间已完成任务被旧快照回写 UI。
+
+scripts/upload-queue-smoke.js 检查 +、取消、多文件、整目录、暂停时添加、恢复、实时计数和英文最小窗口。与三个旧页面脚本一起回归；不代表真实原生对话框或网盘 E2E。Rust 测试覆盖目录关系、同名同内容、空目录、重叠选择、暂停门/并发/FIFO及重启目录元数据。

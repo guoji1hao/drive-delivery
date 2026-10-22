@@ -472,6 +472,9 @@ mod tests {
         let path = dir.path().join("app.db");
         let database = Database::open(&path).unwrap();
         let mut task = UploadTask {
+            destination_dirs: Default::default(),
+            relative_dir: String::new(),
+            is_directory: false,
             id: "task-1".into(),
             batch_id: "batch-1".into(),
             local_path: "C:/file.zip".into(),
@@ -486,6 +489,9 @@ mod tests {
             google: PlatformTask::waiting(42),
             onedrive: PlatformTask::waiting(42),
         };
+        task.relative_dir = "客户资料/子目录/".into();
+        task.destination_dirs
+            .insert("google".into(), "/delivery/2026-10-22/".into());
         task.onedrive.remote_id = Some("ms-item".into());
         task.onedrive.share.url = Some("https://example.test/onedrive".into());
         database.save_task(&task).unwrap();
@@ -494,6 +500,9 @@ mod tests {
 
         let reopened = Database::open(&path).unwrap();
         assert_eq!(reopened.get_task("task-1").unwrap().unwrap().file_size, 42);
+        let restored = reopened.get_task("task-1").unwrap().unwrap();
+        assert_eq!(restored.relative_dir, "客户资料/子目录/");
+        assert_eq!(restored.destination_dirs["google"], "/delivery/2026-10-22/");
         let history = reopened.search_history("file", 10).unwrap();
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].onedrive_remote_id.as_deref(), Some("ms-item"));
@@ -503,7 +512,13 @@ mod tests {
         );
         let mut payload = serde_json::to_value(&task).unwrap();
         payload.as_object_mut().unwrap().remove("onedrive");
+        payload.as_object_mut().unwrap().remove("relativeDir");
+        payload.as_object_mut().unwrap().remove("isDirectory");
+        payload.as_object_mut().unwrap().remove("destinationDirs");
         let legacy = super::parse_task(payload.to_string()).unwrap();
+        assert!(legacy.relative_dir.is_empty());
+        assert!(legacy.destination_dirs.is_empty());
+        assert!(!legacy.is_directory);
         assert_eq!(legacy.onedrive.state, PlatformState::Paused);
         assert_eq!(legacy.onedrive.total_bytes, 42);
         assert_eq!(legacy.state, TaskState::PartialSuccess);
@@ -564,6 +579,9 @@ mod tests {
     #[test]
     fn legacy_task_payload_ignores_removed_provider_fields() {
         let mut task = UploadTask {
+            destination_dirs: Default::default(),
+            relative_dir: String::new(),
+            is_directory: false,
             id: "task-legacy".into(),
             batch_id: "batch-legacy".into(),
             local_path: "C:/legacy.zip".into(),
@@ -596,6 +614,9 @@ mod tests {
     #[test]
     fn legacy_duplicate_without_baidu_result_becomes_resumable() {
         let task = UploadTask {
+            destination_dirs: Default::default(),
+            relative_dir: String::new(),
+            is_directory: false,
             id: "task-quark-only".into(),
             batch_id: "batch-legacy".into(),
             local_path: "C:/legacy.zip".into(),
@@ -629,6 +650,9 @@ mod tests {
         google.state = PlatformState::Completed;
         google.remote_path = Some("My Drive/自动发货/file.zip".into());
         let with_baidu = UploadTask {
+            destination_dirs: Default::default(),
+            relative_dir: String::new(),
+            is_directory: false,
             id: "with-baidu".into(),
             batch_id: "batch".into(),
             local_path: "C:/file.zip".into(),
@@ -644,6 +668,9 @@ mod tests {
             onedrive: PlatformTask::waiting(7),
         };
         let without_baidu = UploadTask {
+            destination_dirs: Default::default(),
+            relative_dir: String::new(),
+            is_directory: false,
             id: "without-baidu".into(),
             updated_at: 2,
             baidu: PlatformTask::waiting(7),

@@ -90,3 +90,7 @@ Google 本次保留现有 Desktop OAuth、drive.file、8 MiB resumable 和 anyon
 ## 绑定引导复核（2026-10-21）
 
 页面内的首次设置步骤依据 [Google Drive 快速入门](https://developers.google.com/workspace/drive/api/quickstart/python?hl=zh-cn)、[Microsoft 应用注册](https://learn.microsoft.com/zh-cn/entra/identity-platform/quickstart-register-app)、[微软认证流限制](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)和前述百度 OAuth 接入指南。Google 选择 Desktop app、下载配置并为测试应用添加测试用户；微软个人账号需选择包含个人账号的应用类型，设备码需要 public client。普通用户登录时无需了解这些参数；缺少应用配置时仍需发布者或用户先完成首次设置。
+
+## 文件夹与系统选择器（2026-10-22）
+
+选择文件/目录使用 [Tauri Dialog 官方插件](https://v2.tauri.app/plugin/dialog/)。目录创建依据 [百度官方 SDK mkdir](https://github.com/baidu-netdisk/baidu-drive-sdk-go/blob/main/baidudriver/api/file_manager_mkdir.go)、[Google 文件夹指南](https://developers.google.com/workspace/drive/api/guides/folder)与 [Microsoft Graph 创建目录](https://learn.microsoft.com/en-us/graph/api/driveitem-post-children)。新增 ensure_directory 接口，保留选中根目录、子目录和空目录；本地协议实现与 Mock 交互通过不代表真实账户验收。

@@ -1,5 +1,21 @@
 // Chinese source strings are stable keys. User filenames, paths and templates are never translated.
 export const en: Record<string, string> = Object.fromEntries(`
+选择文件上传|Choose files to upload
+选择文件|Choose files
+上传整个文件夹|Upload a folder
+点 + 选文件，也可以直接拖进来|Click + to choose files, or drop them here
+整个文件夹也能上传，里面的子目录和空文件夹也会保留。|Upload a whole folder, including its subfolders and empty folders.
+队列就绪|Queue ready
+队列已暂停|Queue paused
+队列处理中|Queue active
+暂停后不再开始下一项，正在上传的文件会继续完成。|Pausing stops new items from starting. Current uploads will finish.
+暂停队列|Pause queue
+继续队列|Resume queue
+文件夹|Folder
+保留目录|Folder path
+文件夹已创建|Folder created
+该文件仍在队列中，请等待当前处理结束后重试|This item is still queued or running. Wait for it to finish before retrying.
+
 文件上传成功，当前百度个人开放 API 文档未确认支持自动创建公开分享|Uploaded. Automatic public sharing is not confirmed for Baidu's personal open API.
 默认模板会随界面语言生成文案；自己修改过的模板保持原文。|Default share text follows the interface language. Custom templates keep their original text.
 选择 JSON 文件|Choose JSON file

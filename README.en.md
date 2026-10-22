@@ -39,3 +39,11 @@ npm.cmd run tauri build -- --bundles nsis
 ```
 
 Run Rust commands in a Visual Studio developer shell. Browser smoke scripts in `scripts/` mock Tauri IPC. They verify UI behavior, not live provider authorization or uploads. See [verification notes](docs/VERIFICATION.md).
+
+## File selection, folders and queue controls (0.4.0)
+
+Click + or Choose files to select multiple files. Use Upload a folder to select a complete folder, or drag it into the window. The selected root, nested folders and empty folders are preserved. OneDrive continues to append a stable task ID to filenames to prevent overwrites. Folder members do not reuse content-only history from another location.
+
+Pause queue stops new items from starting; current uploads finish. Files may still be added while paused. Resume queue continues in order. All batches and manual retries share the concurrency limit. Destinations and date folders are fixed when items are added. Restarted incomplete jobs remain paused for explicit per-drive retry; the queue toggle applies to the current session.
+
+Local tests and mocked desktop IPC cover selection and scheduling. Real provider authorization, folder creation and upload require account-level acceptance.

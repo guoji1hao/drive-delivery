@@ -7,11 +7,13 @@ mod errors;
 mod logging;
 mod models;
 mod plugins;
+mod queue;
 mod secret_store;
 mod settings;
 mod share_manager;
 mod state;
 mod task_manager;
+mod upload_selection;
 
 use state::AppState;
 use tauri::Manager;
@@ -20,6 +22,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let state = AppState::initialize(app.handle().clone())?;
             app.manage(state);
@@ -43,6 +46,7 @@ pub fn run() {
             commands::poll_onedrive_auth,
             commands::clear_onedrive_auth,
             commands::enqueue_paths,
+            commands::set_queue_paused,
             commands::pause_task,
             commands::cancel_task,
             commands::retry_task,

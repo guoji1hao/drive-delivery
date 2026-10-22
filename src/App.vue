@@ -8,8 +8,10 @@ import DropZone from "./components/DropZone.vue";
 import HistoryView from "./components/HistoryView.vue";
 import SettingsView from "./components/SettingsView.vue";
 import TaskList from "./components/TaskList.vue";
+import { open } from "@tauri-apps/plugin-dialog";
 import { api } from "./services/api";
 import type {
+  QueueStatus,
   AppSettings,
   AppSnapshot,
   AuthStatus,
@@ -24,9 +26,13 @@ const activeTab = ref<Tab>("tasks");
 const dragActive = ref(false);
 const enqueueBusy = ref(false);
 const loading = ref(true);
+const pickerBusy = ref(false);
+const queueBusy = ref(false);
+const queue = ref<QueueStatus>({ paused: false, waiting: 0, running: 0 });
 const fatalError = ref<string>();
 const toast = ref<string>();
 let toastTimer: number | undefined;
+let unlistenQueue: UnlistenFn | undefined;
 let unlistenTask: UnlistenFn | undefined;
 let unlistenDrop: UnlistenFn | undefined;
 
@@ -57,7 +63,7 @@ async function enqueue(paths: string[]) {
     showToast(
       result.duplicates
         ? tf("已接收 {count} 个文件，其中 {duplicates} 个命中历史记录", "Received {count} files; {duplicates} found in history", { count: result.accepted, duplicates: result.duplicates })
-        : tf("已接收 {count} 个文件，开始并行处理", "Received {count} files. Processing now", { count: result.accepted }),
+        : tf("已接收 {count} 项，已加入处理队列", "Received {count} items. Added to the queue", { count: result.accepted }),
     );
   } catch (error) {
     showToast(String(error));
@@ -65,6 +71,25 @@ async function enqueue(paths: string[]) {
     enqueueBusy.value = false;
     dragActive.value = false;
   }
+}
+
+async function chooseUpload(directory: boolean) {
+  if (pickerBusy.value || enqueueBusy.value) return;
+  pickerBusy.value = true;
+  try {
+    const selection = await open({ directory, multiple: !directory,
+      title: t(directory ? "上传整个文件夹" : "选择文件上传") });
+    if (selection) await enqueue(Array.isArray(selection) ? selection : [selection]);
+  } catch (error) { showToast(String(error)); }
+  finally { pickerBusy.value = false; }
+}
+
+async function toggleQueue() {
+  if (queueBusy.value) return;
+  queueBusy.value = true;
+  try { queue.value = await api.setQueuePaused(!queue.value.paused); }
+  catch (error) { showToast(String(error)); }
+  finally { queueBusy.value = false; }
 }
 
 async function control(
@@ -130,6 +155,7 @@ watch(locale, () => { if (snapshot.value) api.saveLanguage().catch(error => show
 
 onMounted(async () => {
   try {
+    unlistenQueue = await listen<QueueStatus>("queue-update", event => { queue.value = event.payload; });
     unlistenTask = await listen<UploadTask>("task-update", (event) =>
       updateTask(event.payload),
     );
@@ -143,6 +169,7 @@ onMounted(async () => {
       }
     });
     snapshot.value = await api.initialize();
+    queue.value = snapshot.value.queue ?? queue.value;
     await api.saveLanguage().catch(error => showToast(String(error)));
   } catch (error) {
     fatalError.value = String(error);
@@ -153,6 +180,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   unlistenTask?.();
+  unlistenQueue?.();
   unlistenDrop?.();
   window.clearTimeout(toastTimer);
 });
@@ -204,7 +232,15 @@ onBeforeUnmount(() => {
           <h1>{{ t("一次拖入，送达已启用的网盘。") }}</h1>
           <p>{{ t("百度网盘、Google Drive 与 OneDrive 并行上传，支持真实进度、断点续传、独立重试和历史去重。") }}</p>
         </section>
-        <DropZone :active="dragActive" :busy="enqueueBusy" />
+        <DropZone :active="dragActive" :busy="enqueueBusy || pickerBusy" @choose-files="chooseUpload(false)" @choose-folder="chooseUpload(true)" />
+        <section class="queue-controls" :class="{ paused: queue.paused }" aria-live="polite">
+          <div>
+            <strong>{{ t(queue.paused ? '队列已暂停' : queue.running || queue.waiting ? '队列处理中' : '队列就绪') }}</strong>
+            <p>{{ tf('{running} 项处理中 · {waiting} 项排队', '{running} processing · {waiting} waiting', { running: queue.running, waiting: queue.waiting }) }}</p>
+            <small>{{ t('暂停后不再开始下一项，正在上传的文件会继续完成。') }}</small>
+          </div>
+          <button class="small-button" :disabled="queueBusy" @click="toggleQueue">{{ t(queue.paused ? '继续队列' : '暂停队列') }}</button>
+        </section>
         <TaskList
           :tasks="tasks"
           @pause="pauseTask"

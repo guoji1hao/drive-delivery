@@ -47,6 +47,8 @@ export interface PlatformTask {
 }
 
 export interface UploadTask {
+  relativeDir?: string;
+  isDirectory?: boolean;
   id: string;
   batchId: string;
   localPath: string;
@@ -141,7 +143,10 @@ export interface DrivePlugin {
   enabled: boolean;
 }
 
+export interface QueueStatus { paused: boolean; waiting: number; running: number }
+
 export interface AppSnapshot {
+  queue: QueueStatus;
   plugins: DrivePlugin[];
   tasks: UploadTask[];
   settings: AppSettings;
