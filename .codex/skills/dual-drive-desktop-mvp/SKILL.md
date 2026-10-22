@@ -85,3 +85,10 @@ upload_selection.rs 负责文件展开，canonicalize 去重重叠输入，保�
 queue.rs 持有跨批次 FIFO、活动任务集合和暂停门。新批次及手动重试都经同一调度器；禁止同任务并发重试以防共享状态覆盖。暂停停止派发后续项目，当前文件继续完成；不假装中断网络请求。Notify 必须先注册再检查条件避免丢唤醒。任务最终释放槽位并推送 queue-update，入队返回最新数据库状态避免慢 Hash 期间已完成任务被旧快照回写 UI。
 
 scripts/upload-queue-smoke.js 检查 +、取消、多文件、整目录、暂停时添加、恢复、实时计数和英文最小窗口。与三个旧页面脚本一起回归；不代表真实原生对话框或网盘 E2E。Rust 测试覆盖目录关系、同名同内容、空目录、重叠选择、暂停门/并发/FIFO及重启目录元数据。
+
+
+## 独立浏览器版（2026-10-22）
+
+browser-extension 独立于 Tauri。auth.js 管会话凭据与账号绑定代次，queue.js 管全局两槽 FIFO 与暂停派发，files.js 保留目录层级与空目录，providers 分别实现官方协议。npm run extension:test 使用 Node 原生测试；extension:build 生成 dist-extension，打包须包含 INSTALL、MIT 和 spark-md5 许可证。测试 fixture 不代表原生扩展或真实网盘验收。
+
+Chrome Google 使用 manifest oauth2 + identity.getAuthToken，不能混用桌面 Client ID 或宣称 Edge 支持。OneDrive 用 SPA redirect + PKCE，不放 secret；百度个人 secret 仅存 session。上传页保持单实例锁，不依赖 service worker 长驻。关闭页面失去 File 与队列，必须提前告知，不能宣称重启续传。Google 预生成 file ID，微软/百度稳定任务后缀，完成响应丢失先查结果；未知会话状态禁止直接重建。百度父目录结果必须分页查找，commit 必须含全部分片 hash。

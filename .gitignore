@@ -37,3 +37,6 @@ target
 
 .playwright-cli/
 output/
+
+dist-extension/
+release-artifacts/

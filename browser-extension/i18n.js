@@ -1,0 +1,35 @@
+export const messages = {
+  eyebrow: ['文件直接到网盘 · 无需桌面软件', 'DIRECT TO YOUR DRIVES · NO DESKTOP APP'],
+  title: ['选好文件，交给你的网盘。', 'Your files. Your drives. One place.'],
+  subtitle: ['绑定一次，选择文件或整个文件夹。上传直接在浏览器完成。', 'Connect your drives. Choose files or a whole folder. Upload right from your browser.'],
+  drop: ['点 + 选文件，或直接拖到这里', 'Click + to choose files, or drop them here'],
+  folderHint: ['文件夹会保留子目录和空文件夹。', 'Folder selection preserves nested and empty folders.'],
+  files: ['选择文件', 'Choose files'], folder: ['上传整个文件夹', 'Upload a folder'],
+  connect: ['绑定网盘', 'Connect drive'], disconnect: ['断开本地绑定', 'Disconnect locally'],
+  connected: ['已绑定', 'Connected'], disconnected: ['未绑定', 'Not connected'],
+  configure: ['首次设置 / 上传位置', 'First-time setup / Destination'],
+  client: ['应用编号（不是账号密码）', 'Application ID (not your password)'], secret: ['你自己的百度 Secret Key', 'Your own Baidu Secret Key'],
+  destination: ['上传到这个文件夹', 'Upload to this folder'], save: ['保存设置', 'Save settings'], saved: ['设置已保存', 'Settings saved'],
+  select: ['上传到此网盘', 'Upload to this drive'],
+  googleGuide: ['Google 绑定需要 Chrome 浏览器和已配置的扩展应用。首次配置：在 Google Cloud 启用 Drive API，创建“Chrome 扩展程序”OAuth 客户端，填入下方扩展 ID。把得到的 Client ID 粘贴到这里，下载配置并替换扩展文件夹内的 manifest.json，再到扩展管理页点刷新。软件发布者配置好后，普通用户只需点“绑定网盘”。', 'Google sign-in requires Chrome and an extension OAuth client. Enable Drive API in Google Cloud, create a Chrome Extension OAuth client with the extension ID below, and paste its Client ID here. Download the manifest, replace manifest.json in the extension folder, then reload the extension. Publisher-configured builds need only Connect drive.'],
+  msGuide: ['首次配置：在 Microsoft Entra 注册支持个人 Microsoft 账号的应用，添加“单页应用 SPA”平台，把下方回调地址原样填进去。把 Application (client) ID 粘贴到这里并保存，之后点击绑定即可。不要创建或填写 Client Secret。', 'Register an app in Microsoft Entra with personal Microsoft accounts enabled. Add a Single-page application (SPA) platform using the exact redirect URI below. Paste the Application (client) ID and save, then connect. Do not create or enter a client secret.'],
+  bdGuide: ['首次配置：在百度网盘开放平台注册自己的应用，填写自己的 App Key、Secret Key，并把上传目录改为平台分配的 /apps/应用目录/。绑定时复制验证码，到百度官方页面同意。密钥和令牌只留在当前浏览器会话，关闭浏览器后需要重新绑定；不要把 Secret Key 放入发布包。', 'Create your own app on Baidu Netdisk Open Platform. Enter your own App Key and Secret Key, and set the destination to your assigned /apps/app-folder/. Copy the device code and approve it on Baidu. Secrets and tokens stay in this browser session only. Reconnect after closing the browser. Never package a shared secret.'],
+  download: ['下载 Google 配置文件', 'Download Google manifest'], googleNative: ['Google：Chrome 原生授权；Edge 不支持此绑定方式。', 'Google: native Chrome sign-in; this flow is not supported in Edge.'],
+  ready: ['队列就绪', 'Queue ready'], paused: ['队列已暂停', 'Queue paused'], active: ['正在处理', 'Processing'], pause: ['暂停队列', 'Pause queue'], resume: ['继续队列', 'Resume queue'],
+  pauseHint: ['暂停后不再开始下一项，正在上传的文件会继续完成。', 'Pausing stops new items from starting. Current uploads finish.'],
+  sessionHint: ['上传期间请保留此页面。关闭或刷新页面会丢失未完成队列，需重新选文件；已上传文件保留。百度和 OneDrive 文件名会附加任务编号，避免覆盖。', 'Keep this page open during uploads. Closing or reloading loses unfinished jobs; select files again. Completed files remain. Baidu and OneDrive filenames include a task ID to prevent overwrites.'],
+  share: ['上传后生成公开链接（Google / OneDrive，任何拿到链接的人都可查看）', 'Create public links after upload (Google / OneDrive; anyone with the link can view)'],
+  privacy: ['文件直传官方网盘，无中转服务器，无统计追踪。', 'Files go directly to official cloud APIs. No relay servers or analytics.'],
+  history: ['最近完成', 'Recently completed'], clearHistory: ['清空本地历史', 'Clear local history'], copy: ['复制结果', 'Copy result'], copied: ['已复制', 'Copied'], retry: ['重试', 'Retry'],
+  waiting: ['等待中', 'Waiting'], running: ['上传中', 'Uploading'], completed: ['已完成', 'Completed'], failed: ['未完成', 'Failed'],
+  binding: ['正在等待官方授权…', 'Waiting for authorization…'], stop: ['停止等待', 'Stop waiting'], code: ['复制验证码，再到官方页面确认', 'Copy this code and approve on the official page'],
+  bindingRequired: ['请先绑定并勾选至少一个网盘。', 'Connect and select at least one drive first.'],
+  folderFallback: ['当前浏览器使用兼容选择器，空文件夹不会包含在结果中。', 'The compatibility picker does not include empty folders.'],
+  keepAccount: ['有任务未完成，请处理完任务后再切换账号或配置。', 'Finish pending tasks before switching accounts or changing app configuration.'],
+  otherTab: ['助手已在另一个标签页打开。请回到那个页面继续上传。', 'Drive Delivery is already open in another tab. Continue there.'],
+  'Folder created': ['文件夹已创建', 'Folder created'], 'Public link': ['公开链接', 'Public link'], 'Private file link': ['私人文件链接（仅有权限的人可访问）', 'Private file link (access required)'],
+  'Uploaded. Baidu public sharing is not supported by this official API.': ['已上传。此官方百度接口不支持生成公开分享链接。', 'Uploaded. Baidu public sharing is not supported by this official API.']
+};
+export let language = 'zh-CN';
+export function setLanguage(value) { language = value === 'en' ? 'en' : 'zh-CN'; document.documentElement.lang = language; }
+export function t(key) { return messages[key]?.[language === 'en' ? 1 : 0] ?? key; }

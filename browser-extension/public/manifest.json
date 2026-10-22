@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Drive Delivery · 网盘发货助手",
+  "version": "0.1.0",
+  "description": "Upload files and folders directly to your cloud drives. 独立上传文件和文件夹，支持暂停队列。",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "identity",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://login.microsoftonline.com/*",
+    "https://graph.microsoft.com/*",
+    "https://*.up.1drv.com/*",
+    "https://*.sharepoint.com/*",
+    "https://*.onedrive.com/*",
+    "https://openapi.baidu.com/*",
+    "https://pan.baidu.com/*",
+    "https://d.pcs.baidu.com/*"
+  ],
+  "oauth2": {
+    "client_id": "0-configure.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Drive Delivery / 打开网盘发货助手"
+  },
+  "icons": {
+    "128": "icon.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwxufWgHFdnFDp6wRm4v5EOqKyJr0Kjqi3BSjo5KzvxvP8Y6aDnBzpMqdAh3ftcQUctEGt5tr6SkGvQFT/iwe1Fyzm9heKddt8V+bSxIMDl1ePftJxXm6Iwex1Dd82U6eVFUqRo9ipEaJ5mmb7aq7evqNow61n0O3/f/VA77yaXoKGAF7XR8jKjahq+FuUOeBVE+Dr2+i47KwEh/i6ezRTx0EbSUq6jn+N3plCjjaK/si4zr3iQXzpf3u6OQWbaQ46AIehkhbAwl4GlDYFi9kpdmwLOFzxD5aoplG28FaR8Z1P0QqgbKcIHN+1Omav+fN0uQQ47rfU+s42mUe4pAaswIDAQAB"
+}

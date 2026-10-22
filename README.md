@@ -2,6 +2,14 @@
 
 [English](README.en.md)
 
+## 独立浏览器版 0.1.0
+
+无需安装桌面助手。[下载浏览器扩展](https://github.com/guoji1hao/drive-delivery/releases/tag/browser-v0.1.0)，解压后在 Chrome / Edge 扩展管理页打开开发者模式，点“加载已解压的扩展程序”，选中解压目录，再点工具栏图标。详细图文案步骤见 [安装与绑定说明](browser-extension/INSTALL.md)。
+
+支持中英文、三个官方网盘适配模块、点击 + 选文件、文件夹上传、暂停后续队列、失败重试和本地结果历史。Google 授权仅支持 Chrome。首次需要配置自己的平台应用；当前没有内置公共 OAuth 配置，尚未上架扩展商店。上传时保留页面，关闭或刷新会丢失未完成队列；浏览器版不提供重启续传。公开分享默认关闭。
+
+桌面版和浏览器版独立运行，下面的 Windows 凭据管理、SQLite、重启续传说明仅适用于桌面版。浏览器版详细限制与验收边界见 [验证说明](docs/BROWSER_VERIFICATION.md)。
+
 双盘发货助手是一款 Windows 本地桌面工具。把单个文件、多个文件或文件夹拖入窗口后，程序会调用已启用的网盘插件上传，支持百度网盘、Google Drive 与 OneDrive 官方 API，按平台独立显示真实进度，自动尝试创建分享，并把可用结果整理为一键复制的发货文案。
 
 项目使用 Tauri 2、Vue 3、TypeScript、Vite、Rust 与 SQLite。它不会使用 Cookie、账号密码、抓包或逆向私有接口，也不会伪造平台能力。当前能力边界以 2026-10-21 核验的官方资料为准，详见 [API 调研记录](docs/API_RESEARCH.md)。

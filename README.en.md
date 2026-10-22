@@ -1,3 +1,11 @@
+# Standalone browser extension 0.1.0
+
+[Download the browser release](https://github.com/guoji1hao/drive-delivery/releases/tag/browser-v0.1.0). Unzip it, enable Developer mode in Chrome/Edge Extensions, choose Load unpacked, then click its toolbar icon. No desktop helper is required. [Setup guide](browser-extension/INSTALL.md).
+
+Includes Chinese/English, official Google Drive, OneDrive and Baidu adapters, file/folder selection, a shared pauseable queue, retries and local history. Google sign-in requires Chrome. You must configure your own provider apps; no public OAuth registration is bundled and this is not a store listing. Keep the upload tab open: unfinished jobs do not survive reload/restart. Public sharing is opt-in. [Verification boundaries](docs/BROWSER_VERIFICATION.md).
+
+The Windows documentation below describes the separate desktop edition.
+
 # Drive Delivery
 
 [中文说明](README.md)
