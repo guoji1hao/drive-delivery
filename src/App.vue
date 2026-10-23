@@ -197,13 +197,16 @@ onBeforeUnmount(() => {
         </span>
       </button>
       <nav>
-        <button :class="{ active: activeTab === 'tasks' }" @click="activeTab = 'tasks'">
+        <button :aria-current="activeTab === 'tasks' ? 'page' : undefined" :class="{ active: activeTab === 'tasks' }" @click="activeTab = 'tasks'">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M12 4v16" /></svg>
           {{ t("发货任务") }}
         </button>
-        <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
+        <button :aria-current="activeTab === 'history' ? 'page' : undefined" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5v5h5M4 10a8 8 0 1 1 1 8M12 8v5l3 2" /></svg>
           {{ t("历史记录") }}
         </button>
-        <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
+        <button :aria-current="activeTab === 'settings' ? 'page' : undefined" :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" /></svg>
           {{ t("绑定网盘") }}
         </button>
       </nav>
@@ -276,7 +279,7 @@ onBeforeUnmount(() => {
     </template>
 
     <Transition name="toast">
-      <div v-if="toast" class="toast-message">{{ t(toast) }}</div>
+      <div v-if="toast" class="toast-message" role="status" aria-live="polite">{{ t(toast) }}</div>
     </Transition>
   </main>
 </template>

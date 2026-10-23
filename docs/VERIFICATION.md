@@ -32,3 +32,13 @@ Windows NSIS 构建命令为 `npm.cmd run tauri build -- --bundles nsis`，安�
 AOCI 项目配置继续保留；当前会话没有加载 AOCI MCP 工具，因此未进行语义索引维护或宣称 aligned。需要重新打开项目会话后按实时 Guide 处理。
 
 最终 NSIS 构建成功：双盘发货助手_0.3.0_x64-setup.exe，4854320 字节。SHA-256：373644373FD9D9C176358F8719CC2FF0005EE0D6AABBB4DAFE2542DDD9D9C53B。安装包包含最终前端构建 index-CXLmmHSH.js。
+
+## 2026-10-23 UI 换肤
+
+桌面改为固定侧栏、紧凑上传区、统一蓝灰配色；浏览器版同步面板、按钮与反馈。无新增运行依赖，无上传或授权协议修改。
+
+npm test 7 项、extension:test 11 项通过；前端与扩展生产构建通过。ui-smoke、binding-smoke、plugins-language-smoke、upload-queue-smoke 四组 Mock IPC 回归通过。browser-skin-smoke 检查 Mock Chrome storage、390px 无横向溢出、键盘焦点与 reduced-motion。各脚本使用独立 CLI session，防止 init script 累积污染。
+
+AOCI MCP rc17 已加载并确认交付，但现有索引为零 Entry 骨架；实时 Guide 返回 baseline_missing / scope_change_required，未声明 aligned。本次没有重建整个仓库索引。真实网盘操作、原生扩展运行和安装后交互未执行。
+
+设计参考：https://linear.app/now/behind-the-latest-design-refresh 与 https://fluent2.microsoft.design/layout 。

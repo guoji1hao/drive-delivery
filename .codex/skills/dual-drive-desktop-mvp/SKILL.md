@@ -92,3 +92,11 @@ scripts/upload-queue-smoke.js 检查 +、取消、多文件、整目录、暂停
 browser-extension 独立于 Tauri。auth.js 管会话凭据与账号绑定代次，queue.js 管全局两槽 FIFO 与暂停派发，files.js 保留目录层级与空目录，providers 分别实现官方协议。npm run extension:test 使用 Node 原生测试；extension:build 生成 dist-extension，打包须包含 INSTALL、MIT 和 spark-md5 许可证。测试 fixture 不代表原生扩展或真实网盘验收。
 
 Chrome Google 使用 manifest oauth2 + identity.getAuthToken，不能混用桌面 Client ID 或宣称 Edge 支持。OneDrive 用 SPA redirect + PKCE，不放 secret；百度个人 secret 仅存 session。上传页保持单实例锁，不依赖 service worker 长驻。关闭页面失去 File 与队列，必须提前告知，不能宣称重启续传。Google 预生成 file ID，微软/百度稳定任务后缀，完成响应丢失先查结果；未知会话状态禁止直接重建。百度父目录结果必须分页查找，commit 必须含全部分片 hash。
+
+## 简洁工作区皮肤（2026-10-23）
+
+桌面布局由 src/styles.css 管理，200px 固定左栏配合 app-shell 左侧留位；960px 为当前桌面最小窗口。不要恢复大幅装饰背景或衬线宣传标题。主色为低饱和蓝，成功、失败与暂停保留语义颜色；次要按钮使用描边。浏览器版在 browser-extension/style.css 独立维护相同视觉语言，并适配 390px 窄屏。
+
+交互统一 140ms 状态过渡、1px 按下反馈、focus-visible 与 reduced-motion。透明文件输入外层需 focus-within。导航重叠测试必须同时比较水平和垂直区间，避免把侧栏判成顶部导航冲突。每个既有 smoke 脚本使用独立 Playwright 会话，避免 addInitScript 累积后重载覆盖语言和 fixture。
+
+scripts/browser-skin-smoke.js 在 1421 开发服务上检查 Chrome storage fixture 页面、暂停、中英文、窄屏、焦点和减少动画。脚本在 focus 前发送 Tab 进入键盘模式；鼠标模式的程序 focus 不保证触发 focus-visible。截图使用 output/playwright；这些结果不代表原生扩展或真实网盘验收。

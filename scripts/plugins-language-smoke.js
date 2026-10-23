@@ -40,7 +40,7 @@ async (page) => {
   await page.getByRole('button', { name: 'Copy Google', exact: true }).click();
   if (!await page.evaluate(() => window.pluginCalls.some(c => c.cmd === 'copy_task_result' && c.args.language === 'en'))) throw new Error('Copy language missing from IPC');
   await page.setViewportSize({ width: 960, height: 680 });
-  const overlap = await page.evaluate(() => { const nav = document.querySelector('nav').getBoundingClientRect(); const tools = document.querySelector('.header-tools').getBoundingClientRect(); return nav.right > tools.left || document.documentElement.scrollWidth > 960; });
+  const overlap = await page.evaluate(() => { const nav = document.querySelector('nav').getBoundingClientRect(); const tools = document.querySelector('.header-tools').getBoundingClientRect(); return (nav.left < tools.right && nav.right > tools.left && nav.top < tools.bottom && nav.bottom > tools.top) || document.documentElement.scrollWidth > 960; });
   if (overlap) throw new Error('English navigation overflows the minimum window size');
   await page.setViewportSize({ width: 1180, height: 900 });
   await page.evaluate(() => window.scrollTo(0, 0));
